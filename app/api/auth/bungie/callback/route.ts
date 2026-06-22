@@ -64,16 +64,16 @@ export async function GET(req: NextRequest) {
     return errRedirect("token_fetch_threw", String(e));
   }
 
-  // Fetch Bungie user profile
-  let profile: {
-    membershipId: string;
-    uniqueName?: string;
-    displayName?: string;
-    destinyMemberships?: Array<{ membershipId: string; membershipType: number }>;
-  };
+  // Fetch Bungie memberships — GetMembershipsForCurrentUser returns both
+  // the Bungie.net user info AND linked Destiny platform accounts.
+  // GetCurrentBungieNetUser does NOT include destinyMemberships.
+  let userId: string;
+  let displayName: string;
+  let membershipId: string;
+  let membershipType: number;
   try {
     const userRes = await fetch(
-      "https://www.bungie.net/Platform/User/GetCurrentBungieNetUser/",
+      "https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/",
       {
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
@@ -83,16 +83,26 @@ export async function GET(req: NextRequest) {
     );
     if (!userRes.ok) return errRedirect("user_fetch_failed", String(userRes.status));
     const userData = await userRes.json();
-    profile = userData.Response;
+    const resp = userData.Response as {
+      bungieNetUser: { membershipId: string; uniqueName?: string; displayName?: string };
+      destinyMemberships: Array<{ membershipId: string; membershipType: number; displayName?: string }>;
+      primaryMembershipId?: string;
+    };
+
+    userId = resp.bungieNetUser.membershipId;
+    displayName = resp.bungieNetUser.uniqueName ?? resp.bungieNetUser.displayName ?? "Guardian";
+
+    const memberships = resp.destinyMemberships ?? [];
+    const primary =
+      memberships.find((m) => m.membershipId === resp.primaryMembershipId) ??
+      memberships[0];
+
+    if (!primary) return errRedirect("no_destiny_membership");
+    membershipId = primary.membershipId;
+    membershipType = primary.membershipType;
   } catch (e) {
     return errRedirect("user_fetch_threw", String(e));
   }
-
-  const primaryMembership = profile.destinyMemberships?.[0];
-  const userId: string = profile.membershipId;
-  const displayName: string = profile.uniqueName ?? profile.displayName ?? "Guardian";
-  const membershipId: string = primaryMembership?.membershipId ?? userId;
-  const membershipType: number = primaryMembership?.membershipType ?? 0;
 
   // Encrypt tokens
   let encryptedAccess: string;
