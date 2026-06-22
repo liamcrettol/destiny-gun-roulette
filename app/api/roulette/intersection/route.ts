@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     // Fetch raw weapons for each member (no manifest needed)
     const memberWeaponMap = new Map<string, Awaited<ReturnType<typeof getRawWeapons>>>();
 
+    const memberErrors: string[] = [];
     for (const member of members) {
       try {
         const token = await getBungieToken(member.user_id);
@@ -36,12 +37,15 @@ export async function POST(req: NextRequest) {
         );
         memberWeaponMap.set(member.user_id, weapons);
       } catch (e) {
-        console.warn(`Skipping member ${member.user_id}:`, e);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`Skipping member ${member.user_id}:`, msg);
+        memberErrors.push(msg);
       }
     }
 
     if (memberWeaponMap.size === 0) {
-      return NextResponse.json({ error: "Could not load any member inventories" }, { status: 500 });
+      const reason = memberErrors[0] ?? "Could not load any member inventories";
+      return NextResponse.json({ error: reason }, { status: 500 });
     }
 
     // Compute intersection per slot
