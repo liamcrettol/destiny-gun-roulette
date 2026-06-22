@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         ) }
       : body.keepSlots;
 
-    const roll = rollLoadout(body.intersection, exclude as Partial<Record<WeaponSlot, number>>);
+    const roll = rollLoadout(body.intersection, body.weaponDetails, exclude as Partial<Record<WeaponSlot, number>>);
 
     // Upsert slots into DB
     const slots: WeaponSlot[] = ["kinetic", "energy", "power"];

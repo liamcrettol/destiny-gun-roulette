@@ -1,95 +1,108 @@
 import type { ResolvedWeapon } from "@/types/weapon";
 import type { WeaponSlot } from "@/types/bungie";
 
-/**
- * Given each lobby member's weapon list, find weapon hashes every member owns.
- * Returns a map of slot → array of item hashes shared by all members.
- * Intersection is on itemHash (same weapon type/name), NOT instanceId.
- */
 export function computeWeaponIntersection(
-  memberWeapons: Map<string, ResolvedWeapon[]> // userId → weapons
+  memberWeapons: Map<string, ResolvedWeapon[]>
 ): Record<WeaponSlot, number[]> {
-  const result: Record<WeaponSlot, number[]> = {
-    kinetic: [],
-    energy: [],
-    power: [],
-  };
-
+  const result: Record<WeaponSlot, number[]> = { kinetic: [], energy: [], power: [] };
   if (memberWeapons.size === 0) return result;
 
   const slots: WeaponSlot[] = ["kinetic", "energy", "power"];
-
   for (const slot of slots) {
-    // Build a set of hashes each member has for this slot
     const memberHashSets: Set<number>[] = [];
-
     for (const weapons of Array.from(memberWeapons.values())) {
       const hashes = new Set<number>(
         (weapons as ResolvedWeapon[]).filter((w) => w.slot === slot).map((w) => w.itemHash)
       );
       memberHashSets.push(hashes);
     }
-
     if (memberHashSets.length === 0) continue;
-
-    // Intersection: only hashes that appear in every member's set
     const [first, ...rest] = memberHashSets;
-    const shared = Array.from(first).filter((hash) =>
-      rest.every((set) => set.has(hash))
-    );
-
-    result[slot] = shared;
+    result[slot] = Array.from(first).filter((hash) => rest.every((set) => set.has(hash)));
   }
-
   return result;
 }
 
-/**
- * For a given shared itemHash and a specific user's weapon list,
- * find the best instance of that weapon (prefer already equipped,
- * then character inventory, then vault).
- */
 export function findBestInstance(
   itemHash: number,
   userWeapons: ResolvedWeapon[]
 ): ResolvedWeapon | null {
   const candidates = userWeapons.filter((w) => w.itemHash === itemHash);
   if (candidates.length === 0) return null;
+  return (
+    candidates.find((w) => w.isEquipped) ??
+    candidates.find((w) => w.location === "character") ??
+    candidates[0]
+  );
+}
 
-  // Prefer equipped > character > vault
-  const equipped = candidates.find((w) => w.isEquipped);
-  if (equipped) return equipped;
+// Archetype pairing rules.
+// Key = weapon type of one primary slot.
+// Value = allowed weapon types for the OTHER primary slot.
+// Falls back to unrestricted if none of the allowed types exist in the pool.
+const ARCHETYPE_RULES: Record<string, string[]> = {
+  "Pulse Rifle": ["Shotgun"],
+  "Hand Cannon": ["Shotgun", "Sniper Rifle"],
+};
 
-  const onCharacter = candidates.find((w) => w.location === "character");
-  if (onCharacter) return onCharacter;
+type WeaponDetail = { weaponType: string };
 
-  return candidates[0];
+function applyPairingRule(
+  pool: number[],
+  pairedType: string,
+  details: Record<string, WeaponDetail>
+): number[] {
+  const allowed = ARCHETYPE_RULES[pairedType];
+  if (!allowed) return pool;
+  const filtered = pool.filter((h) => allowed.includes(details[h.toString()]?.weaponType ?? ""));
+  // Fall back to full pool if no matching weapons exist (don't leave slot empty)
+  return filtered.length > 0 ? filtered : pool;
+}
+
+function pick(pool: number[]): number | null {
+  return pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
 }
 
 /**
- * Randomly pick one hash from each slot's shared pool.
- * Returns null for a slot if no shared weapons exist.
+ * Roll a loadout from the shared pool, applying archetype pairing rules
+ * between kinetic and energy slots.
+ *
+ * Rules (symmetric — applies whichever slot has the constrained type):
+ *   Pulse Rifle  → paired slot must be a Shotgun
+ *   Hand Cannon  → paired slot must be a Shotgun or Sniper Rifle (random)
  */
 export function rollLoadout(
   intersection: Record<WeaponSlot, number[]>,
-  exclude?: Partial<Record<WeaponSlot, number>> // for reroll-one
+  weaponDetails: Record<string, WeaponDetail>,
+  exclude?: Partial<Record<WeaponSlot, number>>
 ): Record<WeaponSlot, number | null> {
-  const slots: WeaponSlot[] = ["kinetic", "energy", "power"];
-  const result: Record<WeaponSlot, number | null> = {
-    kinetic: null,
-    energy: null,
-    power: null,
-  };
+  const kineticKept = exclude?.kinetic !== undefined;
+  const energyKept = exclude?.energy !== undefined;
 
-  for (const slot of slots) {
-    if (exclude?.[slot] !== undefined) {
-      result[slot] = exclude[slot]!;
-      continue;
-    }
-    const pool = intersection[slot];
-    if (pool.length === 0) continue;
-    result[slot] = pool[Math.floor(Math.random() * pool.length)];
+  let kineticHash: number | null = exclude?.kinetic ?? null;
+  let energyHash: number | null = exclude?.energy ?? null;
+
+  // Roll kinetic first (if not locked)
+  if (!kineticKept) {
+    // If energy is already locked, let its type constrain the kinetic pool
+    const energyType = energyHash !== null ? weaponDetails[energyHash.toString()]?.weaponType : null;
+    const kPool = energyType
+      ? applyPairingRule(intersection.kinetic, energyType, weaponDetails)
+      : intersection.kinetic;
+    kineticHash = pick(kPool);
   }
 
-  return result;
+  // Roll energy (if not locked), constrained by whatever kinetic ended up as
+  if (!energyKept) {
+    const kineticType = kineticHash !== null ? weaponDetails[kineticHash.toString()]?.weaponType : null;
+    const ePool = kineticType
+      ? applyPairingRule(intersection.energy, kineticType, weaponDetails)
+      : intersection.energy;
+    energyHash = pick(ePool);
+  }
+
+  // Power is always independent
+  const powerHash = exclude?.power ?? pick(intersection.power);
+
+  return { kinetic: kineticHash, energy: energyHash, power: powerHash };
 }

@@ -46,6 +46,9 @@ export default function LobbyRoom({
   // Slots locked to their current rolled weapon — excluded from Roll All
   const [lockedSlots, setLockedSlots] = useState<Set<WeaponSlot>>(new Set());
   const applyAbortRef = useRef<AbortController | null>(null);
+  // Keep a ref to roundId so realtime callbacks always see the current value
+  const roundIdRef = useRef<string | null>(null);
+  useEffect(() => { roundIdRef.current = roundId; }, [roundId]);
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
 
@@ -97,6 +100,8 @@ export default function LobbyRoom({
         (payload) => {
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const s = payload.new as LobbyLoadoutSlot;
+            // Filter out slot changes from other lobbies' rounds
+            if (roundIdRef.current && s.round_id !== roundIdRef.current) return;
             setSlots((prev) => [...prev.filter((x) => x.slot !== s.slot), s]);
           }
         }
