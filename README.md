@@ -25,7 +25,7 @@ The app does not store Bungie passwords. Authentication is handled through Bungi
 
 Local development uses:
 
-http://localhost:3000/api/auth/callback/bungie
+`http://localhost:3000/api/auth/callback/bungie`
 
 ## Status
 
