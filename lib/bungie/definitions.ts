@@ -15,6 +15,7 @@ export interface WeaponDefinition {
   tierType: number;
   flavorText: string;
   defaultBucketHash: number;
+  collectibleHash?: number; // present if this item appears in Collections
   stats: Record<string, number>; // stat label → value (0-100 range for most)
   intrinsicPerk: string | null;  // archetype/frame name
 }
@@ -95,6 +96,7 @@ export async function getWeaponDefinition(
       tierType: def.inventory?.tierType ?? 5,
       flavorText: def.flavorText ?? "",
       defaultBucketHash: def.inventory?.bucketTypeHash ?? 0,
+      collectibleHash: def.collectibleHash ?? undefined,
       stats,
       intrinsicPerk,
     };

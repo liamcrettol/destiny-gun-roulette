@@ -4,12 +4,14 @@ import { adminSupabase } from "@/lib/supabase/admin";
 import { getRawWeapons } from "@/lib/bungie/rawInventory";
 import { getWeaponDefinitions, getPerkNames } from "@/lib/bungie/definitions";
 import { getWeaponPerkHashes } from "@/lib/bungie/sockets";
+import { getAcquiredCollectibles } from "@/lib/bungie/collectibles";
 import { z } from "zod";
 import type { WeaponSlot } from "@/types/bungie";
+import { bucketToSlot } from "@/types/bungie";
 
 const schema = z.object({
   lobbyId: z.string().uuid(),
-  characterId: z.string().optional(), // filter equippedHashes to this character
+  characterId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -17,7 +19,6 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     const { lobbyId, characterId } = schema.parse(await req.json());
 
-    // Get all members
     const { data: members } = await adminSupabase
       .from("lobby_members")
       .select("user_id, bungie_membership_type, bungie_membership_id")
@@ -27,61 +28,110 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No members found" }, { status: 404 });
     }
 
-    // Fetch raw weapons for each member (no manifest needed)
-    const memberWeaponMap = new Map<string, Awaited<ReturnType<typeof getRawWeapons>>>();
+    const slots: WeaponSlot[] = ["kinetic", "energy", "power"];
 
-    const memberErrors: string[] = [];
-    for (const member of members) {
+    // ── Phase 1: fetch inventories + collectibles for all members in parallel ──
+
+    const memberWeaponMap = new Map<string, Awaited<ReturnType<typeof getRawWeapons>>>();
+    const memberCollectibleMap = new Map<string, Set<number>>(); // userId → acquired collectible hashes
+
+    await Promise.all(members.map(async (member) => {
       try {
         const token = await getBungieToken(member.user_id);
-        const weapons = await getRawWeapons(
-          member.bungie_membership_type,
-          member.bungie_membership_id,
-          token
-        );
+        const [weapons, collectibles] = await Promise.all([
+          getRawWeapons(member.bungie_membership_type, member.bungie_membership_id, token),
+          getAcquiredCollectibles(member.bungie_membership_type, member.bungie_membership_id, token).catch(() => new Set<number>()),
+        ]);
         memberWeaponMap.set(member.user_id, weapons);
+        memberCollectibleMap.set(member.user_id, collectibles);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`Skipping member ${member.user_id}:`, msg);
-        memberErrors.push(msg);
+        console.warn(`Skipping member ${member.user_id}:`, e instanceof Error ? e.message : e);
       }
-    }
+    }));
 
     if (memberWeaponMap.size === 0) {
-      const reason = memberErrors[0] ?? "Could not load any member inventories";
-      return NextResponse.json({ error: reason }, { status: 500 });
+      return NextResponse.json({ error: "Could not load any member inventories" }, { status: 500 });
     }
 
-    // Compute intersection per slot
-    // Solo: use own weapons as the pool (intersection of 1 = all)
-    const slots: WeaponSlot[] = ["kinetic", "energy", "power"];
-    const intersection: Record<WeaponSlot, number[]> = { kinetic: [], energy: [], power: [] };
+    // ── Phase 2: per-member inventory hash sets (per slot) ─────────────────────
 
+    const memberSlotSets = new Map<string, Record<WeaponSlot, Set<number>>>();
+    for (const [userId, weapons] of memberWeaponMap) {
+      const sets: Record<WeaponSlot, Set<number>> = { kinetic: new Set(), energy: new Set(), power: new Set() };
+      for (const w of weapons) sets[w.slot].add(w.itemHash);
+      memberSlotSets.set(userId, sets);
+    }
+
+    // ── Phase 3: inventory intersection ────────────────────────────────────────
+
+    const intersection: Record<WeaponSlot, Set<number>> = { kinetic: new Set(), energy: new Set(), power: new Set() };
     for (const slot of slots) {
-      const memberHashSets: Set<number>[] = [];
-      for (const weapons of Array.from(memberWeaponMap.values())) {
-        const hashes = new Set<number>(weapons.filter((w) => w.slot === slot).map((w) => w.itemHash));
-        memberHashSets.push(hashes);
+      const memberSets = [...memberSlotSets.values()].map((s) => s[slot]);
+      if (memberSets.length === 0) continue;
+      const [first, ...rest] = memberSets;
+      for (const hash of first) {
+        if (rest.every((s) => s.has(hash))) intersection[slot].add(hash);
       }
-      if (memberHashSets.length === 0) continue;
-      const [first, ...rest] = memberHashSets;
-      intersection[slot] = Array.from(first).filter((h) => rest.every((s) => s.has(h)));
     }
 
-    // Look up definitions only for the intersected hashes (fast — 3 parallel calls max per slot)
-    const allHashes = [...new Set([
+    // ── Phase 4: exotic collection expansion ───────────────────────────────────
+    // Candidates: exotic weapons in someone's inventory but NOT already in the
+    // inventory intersection (no duplicate entries).
+
+    const unionHashes = new Set<number>();
+    for (const sets of memberSlotSets.values()) {
+      for (const slot of slots) sets[slot].forEach((h) => unionHashes.add(h));
+    }
+    // Exclude hashes already in intersection — those need no collection check
+    for (const slot of slots) intersection[slot].forEach((h) => unionHashes.delete(h));
+
+    // Look up definitions for candidates (to find exotics with collectibleHash + slot)
+    const candidateDefMap = unionHashes.size > 0 ? await getWeaponDefinitions([...unionHashes]) : new Map();
+
+    const collectionHashSet = new Set<number>(); // hashes added via collections
+
+    for (const [hash, def] of candidateDefMap) {
+      if (def.tierType !== 6) continue;         // only exotics
+      if (!def.collectibleHash) continue;        // must be in collections
+      const slot = bucketToSlot(def.defaultBucketHash);
+      if (!slot) continue;
+
+      // All members must have it: either in their inventory or in their collections
+      let allHaveIt = true;
+      for (const [userId, sets] of memberSlotSets) {
+        if (sets[slot].has(hash)) continue;      // has it in inventory ✓
+        const acquired = memberCollectibleMap.get(userId);
+        if (!acquired?.has(def.collectibleHash)) { allHaveIt = false; break; }
+      }
+
+      if (allHaveIt) {
+        intersection[slot].add(hash);
+        collectionHashSet.add(hash);
+      }
+    }
+
+    // ── Phase 5: look up definitions for final intersection ────────────────────
+
+    const allIntersectionHashes = [...new Set([
       ...intersection.kinetic,
       ...intersection.energy,
       ...intersection.power,
     ])];
 
-    const defMap = await getWeaponDefinitions(allHashes);
+    // Merge candidate defs (already fetched) with a fresh batch for inventory hashes
+    const inventoryOnlyHashes = allIntersectionHashes.filter((h) => !candidateDefMap.has(h));
+    const inventoryDefMap = inventoryOnlyHashes.length > 0
+      ? await getWeaponDefinitions(inventoryOnlyHashes)
+      : new Map();
+
+    const defMap = new Map([...inventoryDefMap, ...candidateDefMap]);
 
     const weaponDetails: Record<string, {
       name: string; icon: string; weaponType: string; damageType: string;
       tierType: number; tierName: string; ammoType: string; stats: Record<string, number>;
     }> = {};
     for (const [hash, def] of defMap.entries()) {
+      if (!allIntersectionHashes.includes(hash)) continue; // only intersection weapons
       weaponDetails[hash.toString()] = {
         name: def.name,
         icon: def.icon,
@@ -94,36 +144,30 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // Return the requesting user's currently equipped weapon per slot
-    // so the client can seed the initial roll with their current loadout.
-    const myWeapons = memberWeaponMap.get(session.userId) ?? [];
-    const equippedHashes: Record<WeaponSlot, number | null> = {
-      kinetic: null,
-      energy: null,
-      power: null,
+    // Convert sets to arrays for response
+    const intersectionArrays: Record<WeaponSlot, number[]> = {
+      kinetic: [...intersection.kinetic],
+      energy: [...intersection.energy],
+      power: [...intersection.power],
     };
+
+    // ── Phase 6: equipped hashes for seeding the roll ──────────────────────────
+
+    const myWeapons = memberWeaponMap.get(session.userId) ?? [];
+    const equippedHashes: Record<WeaponSlot, number | null> = { kinetic: null, energy: null, power: null };
     for (const slot of slots) {
-      // Prefer the selected character's equipped weapon; fall back to any equipped
       const equipped =
         myWeapons.find((w) => w.slot === slot && w.isEquipped && (!characterId || w.characterId === characterId)) ??
         myWeapons.find((w) => w.slot === slot && w.isEquipped);
-      if (equipped) {
-        // Include even if not in intersection — will be used as seed; roll filters to pool
-        equippedHashes[slot] = equipped.itemHash;
-      }
+      if (equipped) equippedHashes[slot] = equipped.itemHash;
     }
 
-    // Fetch per-instance perk rolls for the requesting user's copies of intersection weapons.
-    // Only for weapons actually in the shared pool (not the full inventory).
-    const allIntersectionHashes = new Set([
-      ...intersection.kinetic,
-      ...intersection.energy,
-      ...intersection.power,
-    ]);
-    const myIntersectionWeapons = myWeapons.filter((w) => allIntersectionHashes.has(w.itemHash));
+    // ── Phase 7: per-instance perk rolls for the captain ──────────────────────
+
+    const allIntersectionHashSet = new Set(allIntersectionHashes);
+    const myIntersectionWeapons = myWeapons.filter((w) => allIntersectionHashSet.has(w.itemHash));
     const myInstanceIds = new Set(myIntersectionWeapons.map((w) => w.itemInstanceId));
 
-    // instancePerks: itemHash → array of instances with named perks
     const instancePerks: Record<string, Array<{
       instanceId: string; perks: string[]; location: string; characterId?: string;
     }>> = {};
@@ -139,7 +183,6 @@ export async function POST(req: NextRequest) {
             myToken,
             myInstanceIds
           );
-
           const allPerkHashes = [...new Set([...perkHashMap.values()].flat())];
           const perkNameMap = await getPerkNames(allPerkHashes);
 
@@ -150,26 +193,21 @@ export async function POST(req: NextRequest) {
             if (perks.length === 0) continue;
             const key = weapon.itemHash.toString();
             if (!instancePerks[key]) instancePerks[key] = [];
-            instancePerks[key].push({
-              instanceId: weapon.itemInstanceId,
-              perks,
-              location: weapon.location,
-              characterId: weapon.characterId,
-            });
+            instancePerks[key].push({ instanceId: weapon.itemInstanceId, perks, location: weapon.location, characterId: weapon.characterId });
           }
         }
       } catch (e) {
-        // Non-fatal: weapon browser still works, just without perk data
         console.warn("Failed to fetch perk rolls:", e instanceof Error ? e.message : e);
       }
     }
 
     return NextResponse.json({
-      intersection,
+      intersection: intersectionArrays,
       weaponDetails,
       memberCount: memberWeaponMap.size,
       equippedHashes,
       instancePerks,
+      collectionHashes: [...collectionHashSet], // exotic weapons added from collections
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
