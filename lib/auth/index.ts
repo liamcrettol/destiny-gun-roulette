@@ -18,7 +18,7 @@ export const authConfig: NextAuthConfig = {
       token: `${BUNGIE_BASE}/Platform/App/OAuth/token/`,
       userinfo: {
         url: `${BUNGIE_BASE}/Platform/User/GetCurrentBungieNetUser/`,
-        async request({ tokens }) {
+        async request({ tokens }: { tokens: { access_token?: string } }) {
           const res = await fetch(
             `${BUNGIE_BASE}/Platform/User/GetCurrentBungieNetUser/`,
             {
