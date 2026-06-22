@@ -9,6 +9,7 @@ import type { WeaponSlot } from "@/types/bungie";
 import LoadoutQueue from "./LoadoutQueue";
 import ApplyStatus from "./ApplyStatus";
 import SignOutButton from "./SignOutButton";
+import WeaponPool from "./WeaponPool";
 import type { ApplyResult } from "@/types/lobby";
 
 interface Props {
@@ -39,7 +40,10 @@ export default function LobbyRoom({
   const [slots, setSlots] = useState<LobbyLoadoutSlot[]>([]);
   const [roundId, setRoundId] = useState<string | null>(null);
   const [intersection, setIntersection] = useState<Record<WeaponSlot, number[]> | null>(null);
-  const [weaponDetails, setWeaponDetails] = useState<Record<string, { name: string; icon: string; weaponType: string; damageType: string }>>({});
+  const [weaponDetails, setWeaponDetails] = useState<Record<string, {
+    name: string; icon: string; weaponType: string; damageType: string;
+    tierType: number; tierName: string; ammoType: string; stats: Record<string, number>;
+  }>>({});
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
@@ -291,6 +295,32 @@ export default function LobbyRoom({
     setLoadingAction(null);
   }, []);
 
+  // Pin a specific weapon hash to a slot — keeps all other slots unchanged
+  const handleSelectWeapon = useCallback(async (slot: WeaponSlot, hash: number) => {
+    if (!intersection || !roundId) return;
+    setLoadingAction("roll");
+
+    // Build keepSlots from current rolled slots, overriding just the chosen slot
+    const keep: Partial<Record<WeaponSlot, number>> = {};
+    for (const s of slots) {
+      if (s.item_hash !== 0) keep[s.slot as WeaponSlot] = s.item_hash;
+    }
+    keep[slot] = hash;
+
+    await fetch("/api/roulette/roll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lobbyId: lobby.id,
+        roundId,
+        intersection,
+        weaponDetails,
+        keepSlots: keep,
+      }),
+    });
+    setLoadingAction(null);
+  }, [intersection, roundId, lobby.id, slots, weaponDetails]);
+
   void bungieMembershipType;
   void bungieMembershipId;
 
@@ -457,6 +487,19 @@ export default function LobbyRoom({
             </div>
           )}
         </div>
+      )}
+
+      {/* Weapon browser — captain can manually pick weapons per slot */}
+      {isCaptain && intersection && (
+        <WeaponPool
+          intersection={intersection}
+          weaponDetails={weaponDetails}
+          currentHashes={Object.fromEntries(
+            slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
+          )}
+          onSelectWeapon={handleSelectWeapon}
+          disabled={loadingAction !== null}
+        />
       )}
 
       {/* Loadout queue */}

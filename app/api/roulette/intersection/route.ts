@@ -76,7 +76,10 @@ export async function POST(req: NextRequest) {
 
     const defMap = await getWeaponDefinitions(allHashes);
 
-    const weaponDetails: Record<string, { name: string; icon: string; weaponType: string; damageType: string; tierType: number }> = {};
+    const weaponDetails: Record<string, {
+      name: string; icon: string; weaponType: string; damageType: string;
+      tierType: number; tierName: string; ammoType: string; stats: Record<string, number>;
+    }> = {};
     for (const [hash, def] of defMap.entries()) {
       weaponDetails[hash.toString()] = {
         name: def.name,
@@ -84,6 +87,9 @@ export async function POST(req: NextRequest) {
         weaponType: def.weaponType,
         damageType: def.damageType,
         tierType: def.tierType,
+        tierName: def.tierName,
+        ammoType: def.ammoType,
+        stats: def.stats,
       };
     }
 

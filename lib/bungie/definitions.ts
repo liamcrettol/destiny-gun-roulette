@@ -14,11 +14,26 @@ export interface WeaponDefinition {
   tierName: string;
   tierType: number;
   flavorText: string;
-  /** inventory.bucketTypeHash — the slot this weapon belongs to (kinetic/energy/power) */
   defaultBucketHash: number;
+  stats: Record<string, number>; // stat label → value (0-100 range for most)
+  intrinsicPerk: string | null;  // archetype/frame name
 }
 
 const AMMO_TYPE_NAMES: Record<number, string> = { 1: "Primary", 2: "Special", 3: "Heavy" };
+
+const WEAPON_STAT_HASHES: Record<number, string> = {
+  4284893193: "RPM",
+  4043523819: "Impact",
+  1240592695: "Range",
+  155624089: "Stability",
+  943549884: "Handling",
+  4188031367: "Reload",
+  1345609583: "Aim Assist",
+  3871231066: "Magazine",
+  2961396640: "Charge Time",
+  1931675084: "Inventory",
+  3555269338: "Zoom",
+};
 const TIER_NAMES: Record<number, string> = { 6: "Exotic", 5: "Legendary", 4: "Rare" };
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
   3373582085: "Kinetic",
@@ -50,6 +65,25 @@ export async function getWeaponDefinition(
     const def = data.Response;
     if (!def || def.itemType !== 3) return null; // not a weapon
 
+    // Parse weapon stats
+    const stats: Record<string, number> = {};
+    for (const [hashStr, statData] of Object.entries(def.stats?.stats ?? {})) {
+      const label = WEAPON_STAT_HASHES[Number(hashStr)];
+      if (label) stats[label] = (statData as { value: number }).value;
+    }
+
+    // Intrinsic frame/archetype — first socket's initial plug display name
+    let intrinsicPerk: string | null = null;
+    const firstSocket = def.sockets?.socketEntries?.[0];
+    if (firstSocket?.singleInitialItemHash) {
+      intrinsicPerk = null; // resolved lazily via separate lookup if needed
+    }
+    // Try to get frame name from itemTypeAndTierDisplayName or intrinsic category
+    if (def.itemSubType) {
+      // itemTypeDisplayName often contains frame info like "Aggressive Frame Hand Cannon"
+      intrinsicPerk = def.itemTypeDisplayName ?? null;
+    }
+
     const result: WeaponDefinition = {
       itemHash,
       name: def.displayProperties?.name ?? "Unknown",
@@ -61,6 +95,8 @@ export async function getWeaponDefinition(
       tierType: def.inventory?.tierType ?? 5,
       flavorText: def.flavorText ?? "",
       defaultBucketHash: def.inventory?.bucketTypeHash ?? 0,
+      stats,
+      intrinsicPerk,
     };
     defCache.set(itemHash, result);
     return result;

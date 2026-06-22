@@ -18,6 +18,7 @@ const schema = z.object({
     icon: z.string(),
     weaponType: z.string(),
     damageType: z.string(),
+    tierType: z.number().optional(),
   })),
   rerollSlot: z.enum(["kinetic", "energy", "power"]).optional(),
   keepSlots: z.object({
