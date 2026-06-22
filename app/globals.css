@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bungie-blue: #00aeef;
+  --bungie-dark: #0d1117;
+  --bungie-surface: #161b22;
+  --bungie-border: #30363d;
+}
+
+body {
+  background-color: var(--bungie-dark);
+  color: #e6edf3;
+}
+
+@layer utilities {
+  .exotic-border {
+    border-color: #c7a64a;
+  }
+  .legendary-border {
+    border-color: #522f65;
+  }
+}
