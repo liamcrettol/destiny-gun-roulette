@@ -294,8 +294,8 @@ function WeaponCard({
 export default function WeaponPool({
   intersection, weaponDetails, instancePerks, collectionHashes, currentHashes, onSelectWeapon, disabled,
 }: Props) {
-  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<WeaponSlot>("kinetic");
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const handleHover = useCallback((hash: number, x: number, y: number) => {
@@ -303,12 +303,19 @@ export default function WeaponPool({
   }, []);
   const handleLeave = useCallback(() => setTooltip(null), []);
 
-  useEffect(() => { if (!open) { setTooltip(null); setSearch(""); } }, [open]);
+  // Clear search when tab changes
+  useEffect(() => { setSearch(""); setTooltip(null); }, [activeTab]);
 
   const slotList: WeaponSlot[] = ["kinetic", "energy", "power"];
   const totalWeapons = slotList.reduce((n, s) => n + intersection[s].length, 0);
   const collectionCount = collectionHashes.size;
   const query = search.toLowerCase().trim();
+
+  const sorted = sortWeapons(intersection[activeTab], weaponDetails);
+  const filtered = query
+    ? sorted.filter((h) => weaponDetails[h.toString()]?.name.toLowerCase().includes(query))
+    : sorted;
+  const activeHash = currentHashes[activeTab];
 
   return (
     <>
@@ -321,87 +328,85 @@ export default function WeaponPool({
         />
       )}
 
-      <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
-        {/* Toggle header */}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition"
-        >
-          <span className="text-white font-semibold text-sm flex items-center gap-3">
-            Weapon Browser
-            <span className="text-gray-500 font-normal text-xs">{totalWeapons} shared weapons</span>
-            {collectionCount > 0 && (
-              <span className="text-xs bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded px-2 py-0.5">
-                +{collectionCount} from collections
-              </span>
-            )}
-          </span>
-          <span className="text-gray-400 text-xs">{open ? "▲ Hide" : "▼ Show"}</span>
-        </button>
+      <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="px-4 pt-3 pb-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-white font-semibold text-sm">Weapon Browser</span>
+            <span className="text-gray-500 text-xs">
+              {totalWeapons} weapons
+              {collectionCount > 0 && (
+                <span className="ml-1.5 text-amber-400">+{collectionCount} collections</span>
+              )}
+            </span>
+          </div>
 
-        {open && (
-          <div className="px-4 pb-4">
-            {/* Search */}
-            <div className="mb-4">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search weapons…"
-                className="w-full bg-bungie-dark border border-bungie-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-bungie-blue transition"
-              />
-            </div>
+          {/* Slot tabs */}
+          <div className="flex gap-1 mt-2">
+            {slotList.map((slot) => (
+              <button
+                key={slot}
+                onClick={() => setActiveTab(slot)}
+                className={`flex-1 py-1.5 rounded-t-lg text-xs font-semibold border-b-2 transition ${
+                  activeTab === slot
+                    ? "border-bungie-blue text-white bg-bungie-blue/10"
+                    : "border-transparent text-gray-400 hover:text-white"
+                }`}
+              >
+                {SLOT_LABELS[slot]}
+                <span className="ml-1 text-gray-500 font-normal">
+                  {intersection[slot].length}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              {slotList.map((slot) => {
-                const sorted = sortWeapons(intersection[slot], weaponDetails);
-                const filtered = query
-                  ? sorted.filter((h) => weaponDetails[h.toString()]?.name.toLowerCase().includes(query))
-                  : sorted;
-                const activeHash = currentHashes[slot];
+        {/* Search */}
+        <div className="px-3 py-2 border-b border-bungie-border">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${SLOT_LABELS[activeTab].toLowerCase()}…`}
+            className="w-full bg-bungie-dark border border-bungie-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-bungie-blue transition"
+          />
+        </div>
+
+        {/* Weapon list */}
+        <div className="px-3 pb-3 space-y-2 overflow-y-auto flex-1">
+          {filtered.length === 0 ? (
+            <p className="text-gray-600 text-xs py-4 text-center">
+              {query ? "No matches" : "No shared weapons"}
+            </p>
+          ) : (
+            <>
+              {query && filtered.length !== sorted.length && (
+                <p className="text-gray-500 text-xs pt-2">{filtered.length} of {sorted.length} weapons</p>
+              )}
+              {filtered.map((hash) => {
+                const detail = weaponDetails[hash.toString()];
+                if (!detail) return null;
+                const rolls = instancePerks[hash.toString()] ?? [];
                 return (
-                  <div key={slot} className="min-w-0">
-                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-bungie-border">
-                      <span className="text-sm font-bold text-white">{SLOT_LABELS[slot]}</span>
-                      <span className="text-gray-500 text-xs">
-                        {filtered.length}{query && filtered.length !== sorted.length ? ` / ${sorted.length}` : ""}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {filtered.length === 0 ? (
-                        <p className="text-gray-600 text-xs py-2">
-                          {query ? "No matches" : "No shared weapons"}
-                        </p>
-                      ) : (
-                        filtered.map((hash) => {
-                          const detail = weaponDetails[hash.toString()];
-                          if (!detail) return null;
-                          const rolls = instancePerks[hash.toString()] ?? [];
-                          return (
-                            <WeaponCard
-                              key={hash}
-                              hash={hash}
-                              detail={detail}
-                              isActive={activeHash === hash}
-                              isCollection={collectionHashes.has(hash)}
-                              rolls={rolls}
-                              slot={slot}
-                              onSelect={(h, instanceId) => onSelectWeapon(slot, h, instanceId)}
-                              disabled={disabled}
-                              onHover={handleHover}
-                              onLeave={handleLeave}
-                            />
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
+                  <WeaponCard
+                    key={hash}
+                    hash={hash}
+                    detail={detail}
+                    isActive={activeHash === hash}
+                    isCollection={collectionHashes.has(hash)}
+                    rolls={rolls}
+                    slot={activeTab}
+                    onSelect={(h, instanceId) => onSelectWeapon(activeTab, h, instanceId)}
+                    disabled={disabled}
+                    onHover={handleHover}
+                    onLeave={handleLeave}
+                  />
                 );
               })}
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </>
   );

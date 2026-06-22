@@ -330,200 +330,205 @@ export default function LobbyRoom({
   void bungieMembershipType;
   void bungieMembershipId;
 
+  const weaponBrowser = isCaptain && intersection ? (
+    <WeaponPool
+      intersection={intersection}
+      weaponDetails={weaponDetails}
+      instancePerks={instancePerks}
+      collectionHashes={collectionHashes}
+      currentHashes={Object.fromEntries(
+        slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
+      )}
+      onSelectWeapon={(slot, hash, instanceId) => handleSelectWeapon(slot, hash, instanceId)}
+      disabled={loadingAction !== null}
+    />
+  ) : null;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Lobby</h1>
-          <p className="text-gray-400 text-sm">
-            Code:{" "}
-            <span className="font-mono text-bungie-blue font-bold tracking-widest">
-              {lobby.code}
-            </span>{" "}
-            — share this with your fireteam
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">Round {lobby.current_round}</span>
-          <button
-            onClick={handleLeave}
-            className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition"
-          >
-            Leave
-          </button>
-          <SignOutButton />
-        </div>
-      </div>
-
-      {/* Members */}
-      <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-        <h2 className="text-white font-semibold mb-3">Fireteam ({members.length})</h2>
-        <div className="flex flex-wrap gap-3">
-          {members.map((m) => (
-            <div
-              key={m.id}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${
-                m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"
-              }`}
+    <div className="flex gap-6 items-start">
+      {/* ── Left: main lobby content ── */}
+      <div className="flex-1 min-w-0 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Lobby</h1>
+            <p className="text-gray-400 text-sm">
+              Code:{" "}
+              <span className="font-mono text-bungie-blue font-bold tracking-widest">
+                {lobby.code}
+              </span>{" "}
+              — share this with your fireteam
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">Round {lobby.current_round}</span>
+            <button
+              onClick={handleLeave}
+              className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition"
             >
-              {m.is_captain && <span title="Captain">👑</span>}
-              <span className={m.is_ready ? "text-green-400" : "text-gray-300"}>
-                {m.display_name}
-              </span>
-              {m.is_ready && <span className="text-green-500 text-xs">✓</span>}
-            </div>
-          ))}
+              Leave
+            </button>
+            <SignOutButton />
+          </div>
         </div>
-      </div>
 
-      {/* Character picker */}
-      {characters.length > 0 && (
+        {/* Members */}
         <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-          <h2 className="text-white font-semibold mb-3">Your Character</h2>
-          <div className="flex gap-3 flex-wrap">
-            {characters.map((c) => (
-              <button
-                key={c.characterId}
-                onClick={() => setSelectedCharId(c.characterId)}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition ${
-                  selectedCharId === c.characterId
-                    ? "border-bungie-blue bg-bungie-blue/20 text-white"
-                    : "border-bungie-border text-gray-400 hover:border-gray-500"
+          <h2 className="text-white font-semibold mb-3">Fireteam ({members.length})</h2>
+          <div className="flex flex-wrap gap-3">
+            {members.map((m) => (
+              <div
+                key={m.id}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${
+                  m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"
                 }`}
               >
-                {CLASS_NAMES[c.classType] ?? "Guardian"} · {c.light}
-              </button>
+                {m.is_captain && <span title="Captain">👑</span>}
+                <span className={m.is_ready ? "text-green-400" : "text-gray-300"}>{m.display_name}</span>
+                {m.is_ready && <span className="text-green-500 text-xs">✓</span>}
+              </div>
             ))}
           </div>
-          <button
-            onClick={handleReady}
-            disabled={!selectedCharId || loadingAction === "ready"}
-            className={`mt-3 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-              isReady ? "bg-green-700 text-white" : "bg-bungie-blue text-white hover:opacity-90"
-            } disabled:opacity-50`}
-          >
-            {loadingAction === "ready" ? "…" : isReady ? "✓ Ready" : "Mark Ready"}
-          </button>
         </div>
-      )}
 
-      {/* Captain controls */}
-      {isCaptain && (
-        <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
-          <h2 className="text-yellow-400 font-semibold mb-3">👑 Captain Controls</h2>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleLoadIntersection}
-              disabled={loadingAction !== null}
-              className="px-4 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-sm text-white hover:border-gray-400 disabled:opacity-50 transition"
-            >
-              {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
-            </button>
-            {intersection && (
-              <>
+        {/* Character picker */}
+        {characters.length > 0 && (
+          <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
+            <h2 className="text-white font-semibold mb-3">Your Character</h2>
+            <div className="flex gap-3 flex-wrap">
+              {characters.map((c) => (
                 <button
-                  onClick={() => handleRoll()}
-                  disabled={loadingAction !== null}
-                  className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
+                  key={c.characterId}
+                  onClick={() => setSelectedCharId(c.characterId)}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition ${
+                    selectedCharId === c.characterId
+                      ? "border-bungie-blue bg-bungie-blue/20 text-white"
+                      : "border-bungie-border text-gray-400 hover:border-gray-500"
+                  }`}
                 >
-                  {loadingAction === "roll" ? "Rolling…" : "🎲 Roll All"}
+                  {CLASS_NAMES[c.classType] ?? "Guardian"} · {c.light}
                 </button>
-                {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => (
+              ))}
+            </div>
+            <button
+              onClick={handleReady}
+              disabled={!selectedCharId || loadingAction === "ready"}
+              className={`mt-3 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                isReady ? "bg-green-700 text-white" : "bg-bungie-blue text-white hover:opacity-90"
+              } disabled:opacity-50`}
+            >
+              {loadingAction === "ready" ? "…" : isReady ? "✓ Ready" : "Mark Ready"}
+            </button>
+          </div>
+        )}
+
+        {/* Captain controls */}
+        {isCaptain && (
+          <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
+            <h2 className="text-yellow-400 font-semibold mb-3">👑 Captain Controls</h2>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleLoadIntersection}
+                disabled={loadingAction !== null}
+                className="px-4 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-sm text-white hover:border-gray-400 disabled:opacity-50 transition"
+              >
+                {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
+              </button>
+              {intersection && (
+                <>
                   <button
-                    key={slot}
-                    onClick={() => handleRoll(slot)}
+                    onClick={() => handleRoll()}
                     disabled={loadingAction !== null}
-                    className="px-3 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-xs text-gray-300 hover:border-gray-400 disabled:opacity-50 transition capitalize"
+                    className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
                   >
-                    Reroll {SLOT_LABELS[slot]}
+                    {loadingAction === "roll" ? "Rolling…" : "🎲 Roll All"}
                   </button>
-                ))}
-              </>
+                  {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => (
+                    <button
+                      key={slot}
+                      onClick={() => handleRoll(slot)}
+                      disabled={loadingAction !== null}
+                      className="px-3 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-xs text-gray-300 hover:border-gray-400 disabled:opacity-50 transition capitalize"
+                    >
+                      Reroll {SLOT_LABELS[slot]}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {intersection && (
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <span className="text-xs text-gray-500">Slot options:</span>
+                {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => {
+                  const locked = lockedSlots.has(slot);
+                  const wildcard = wildcardSlots.has(slot);
+                  const hasRoll = slots.some((s) => s.slot === slot);
+                  return (
+                    <span key={slot} className="flex items-center gap-1">
+                      <button
+                        onClick={() => toggleLock(slot)}
+                        disabled={!hasRoll}
+                        title={`Lock ${SLOT_LABELS[slot]} to current rolled weapon`}
+                        className={`px-2 py-1 rounded text-xs border transition ${
+                          locked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"
+                        } disabled:opacity-30`}
+                      >
+                        {locked ? "🔒" : "🔓"}
+                      </button>
+                      <button
+                        onClick={() => toggleWildcard(slot)}
+                        title={`? — everyone keeps their own ${SLOT_LABELS[slot].toLowerCase()} weapon`}
+                        className={`px-2 py-1 rounded text-xs border transition ${
+                          wildcard ? "border-purple-500 bg-purple-500/20 text-purple-300" : "border-bungie-border text-gray-400 hover:border-gray-400"
+                        }`}
+                      >
+                        ❓
+                      </button>
+                      <span className="text-xs text-gray-500">{SLOT_LABELS[slot]}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {intersectionError && (
+              <div className="mt-2 text-xs text-red-400 break-all">Error: {intersectionError}</div>
+            )}
+            {intersection && (
+              <div className="mt-2 text-xs text-gray-400">
+                Shared pool — Kinetic: {intersection.kinetic.length} · Energy:{" "}
+                {intersection.energy.length} · Power: {intersection.power.length}
+              </div>
             )}
           </div>
+        )}
 
-          {/* Slot modifiers — only shown once a roll exists */}
-          {intersection && (
-            <div className="mt-3 flex flex-wrap gap-2 items-center">
-              <span className="text-xs text-gray-500">Slot options:</span>
-              {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => {
-                const locked = lockedSlots.has(slot);
-                const wildcard = wildcardSlots.has(slot);
-                const hasRoll = slots.some((s) => s.slot === slot);
-                return (
-                  <span key={slot} className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleLock(slot)}
-                      disabled={!hasRoll}
-                      title={`Lock ${SLOT_LABELS[slot]} to current rolled weapon`}
-                      className={`px-2 py-1 rounded text-xs border transition ${
-                        locked
-                          ? "border-yellow-500 bg-yellow-500/20 text-yellow-300"
-                          : "border-bungie-border text-gray-400 hover:border-gray-400"
-                      } disabled:opacity-30`}
-                    >
-                      {locked ? "🔒" : "🔓"}
-                    </button>
-                    <button
-                      onClick={() => toggleWildcard(slot)}
-                      title={`? — everyone keeps their own ${SLOT_LABELS[slot].toLowerCase()} weapon`}
-                      className={`px-2 py-1 rounded text-xs border transition ${
-                        wildcard
-                          ? "border-purple-500 bg-purple-500/20 text-purple-300"
-                          : "border-bungie-border text-gray-400 hover:border-gray-400"
-                      }`}
-                    >
-                      ❓
-                    </button>
-                    <span className="text-xs text-gray-500">{SLOT_LABELS[slot]}</span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
+        {/* Loadout queue */}
+        {slots.length > 0 && (
+          <LoadoutQueue
+            slots={slots}
+            weaponDetails={weaponDetails}
+            onApply={handleApply}
+            onCancelApply={handleCancelApply}
+            selectedCharId={selectedCharId}
+            loading={loadingAction === "apply"}
+          />
+        )}
 
-          {intersectionError && (
-            <div className="mt-2 text-xs text-red-400 break-all">Error: {intersectionError}</div>
-          )}
-          {intersection && (
-            <div className="mt-2 text-xs text-gray-400">
-              Shared pool — Kinetic: {intersection.kinetic.length} · Energy:{" "}
-              {intersection.energy.length} · Power: {intersection.power.length}
-            </div>
-          )}
+        {/* Apply results */}
+        {applyResults.length > 0 && <ApplyStatus results={applyResults} />}
+
+        {/* Weapon browser — mobile fallback (shown inline when no sidebar) */}
+        {weaponBrowser && <div className="xl:hidden">{weaponBrowser}</div>}
+      </div>
+
+      {/* ── Right: sticky weapon browser sidebar ── */}
+      {weaponBrowser && (
+        <div className="hidden xl:block w-[420px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
+          {weaponBrowser}
         </div>
       )}
-
-      {/* Weapon browser — captain can manually pick weapons per slot */}
-      {isCaptain && intersection && (
-        <WeaponPool
-          intersection={intersection}
-          weaponDetails={weaponDetails}
-          instancePerks={instancePerks}
-          collectionHashes={collectionHashes}
-          currentHashes={Object.fromEntries(
-            slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
-          )}
-          onSelectWeapon={(slot, hash, instanceId) => handleSelectWeapon(slot, hash, instanceId)}
-          disabled={loadingAction !== null}
-        />
-      )}
-
-      {/* Loadout queue */}
-      {slots.length > 0 && (
-        <LoadoutQueue
-          slots={slots}
-          weaponDetails={weaponDetails}
-          onApply={handleApply}
-          onCancelApply={handleCancelApply}
-          selectedCharId={selectedCharId}
-          loading={loadingAction === "apply"}
-        />
-      )}
-
-      {/* Apply results */}
-      {applyResults.length > 0 && <ApplyStatus results={applyResults} />}
     </div>
   );
 }
