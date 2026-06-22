@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { signIn } from "@/lib/auth";
+import { completeSignIn } from "./actions";
 
 export default async function CompletePage({
   searchParams,
@@ -11,13 +11,15 @@ export default async function CompletePage({
   if (!code) redirect("/auth/error?error=missing_code");
 
   try {
-    await signIn("credentials", { code, redirectTo: "/dashboard" });
+    await completeSignIn(code);
   } catch (err) {
-    // signIn throws a redirect — if it's not a redirect error, it's a real error
+    // Next.js 15 redirect errors use err.digest, not err.message
+    const digest = (err as { digest?: string }).digest ?? "";
     const message = err instanceof Error ? err.message : String(err);
-    if (!message.includes("NEXT_REDIRECT")) {
-      redirect("/auth/error?error=sign_in_failed");
+    if (digest.startsWith("NEXT_REDIRECT") || message.includes("NEXT_REDIRECT")) {
+      throw err; // let Next.js handle the redirect
     }
-    throw err; // re-throw so Next.js handles the redirect
+    console.error("completeSignIn error:", err);
+    redirect("/auth/error?error=sign_in_failed");
   }
 }
