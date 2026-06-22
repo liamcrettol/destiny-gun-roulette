@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
-import { getWeapons } from "@/lib/bungie/inventory";
-import { ensureManifest } from "@/lib/manifest/lookup";
-import { computeWeaponIntersection } from "@/lib/roulette/intersection";
+import { getRawWeapons } from "@/lib/bungie/rawInventory";
+import { getWeaponDefinitions } from "@/lib/bungie/definitions";
 import { z } from "zod";
+import type { WeaponSlot } from "@/types/bungie";
 
 const schema = z.object({ lobbyId: z.string().uuid() });
 
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     const { lobbyId } = schema.parse(await req.json());
 
-    // Get all members of this lobby
+    // Get all members
     const { data: members } = await adminSupabase
       .from("lobby_members")
       .select("user_id, bungie_membership_type, bungie_membership_id")
@@ -23,44 +23,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No members found" }, { status: 404 });
     }
 
-    await ensureManifest();
-
-    // Fetch weapons for each member (using their stored tokens)
-    const memberWeapons = new Map<string, Awaited<ReturnType<typeof getWeapons>>>();
+    // Fetch raw weapons for each member (no manifest needed)
+    const memberWeaponMap = new Map<string, Awaited<ReturnType<typeof getRawWeapons>>>();
 
     for (const member of members) {
       try {
         const token = await getBungieToken(member.user_id);
-        const weapons = await getWeapons(
+        const weapons = await getRawWeapons(
           member.bungie_membership_type,
           member.bungie_membership_id,
           token
         );
-        memberWeapons.set(member.user_id, weapons);
-      } catch {
-        // Member token expired or missing — skip them
+        memberWeaponMap.set(member.user_id, weapons);
+      } catch (e) {
+        console.warn(`Skipping member ${member.user_id}:`, e);
       }
     }
 
-    const intersection = computeWeaponIntersection(memberWeapons);
+    if (memberWeaponMap.size === 0) {
+      return NextResponse.json({ error: "Could not load any member inventories" }, { status: 500 });
+    }
 
-    // Also return weapon details for display (keyed by hash)
-    const weaponDetails: Record<number, { name: string; icon: string; weaponType: string; damageType: string }> = {};
-    for (const weapons of Array.from(memberWeapons.values())) {
-      for (const w of weapons) {
-        if (!weaponDetails[w.itemHash]) {
-          weaponDetails[w.itemHash] = {
-            name: w.name,
-            icon: w.icon,
-            weaponType: w.weaponType,
-            damageType: w.damageType,
-          };
-        }
+    // Compute intersection per slot
+    // Solo: use own weapons as the pool (intersection of 1 = all)
+    const slots: WeaponSlot[] = ["kinetic", "energy", "power"];
+    const intersection: Record<WeaponSlot, number[]> = { kinetic: [], energy: [], power: [] };
+
+    for (const slot of slots) {
+      const memberHashSets: Set<number>[] = [];
+      for (const weapons of Array.from(memberWeaponMap.values())) {
+        const hashes = new Set<number>(weapons.filter((w) => w.slot === slot).map((w) => w.itemHash));
+        memberHashSets.push(hashes);
       }
+      if (memberHashSets.length === 0) continue;
+      const [first, ...rest] = memberHashSets;
+      intersection[slot] = Array.from(first).filter((h) => rest.every((s) => s.has(h)));
+    }
+
+    // Look up definitions only for the intersected hashes (fast — 3 parallel calls max per slot)
+    const allHashes = [...new Set([
+      ...intersection.kinetic,
+      ...intersection.energy,
+      ...intersection.power,
+    ])];
+
+    const defMap = await getWeaponDefinitions(allHashes);
+
+    const weaponDetails: Record<string, { name: string; icon: string; weaponType: string; damageType: string; tierType: number }> = {};
+    for (const [hash, def] of defMap.entries()) {
+      weaponDetails[hash.toString()] = {
+        name: def.name,
+        icon: def.icon,
+        weaponType: def.weaponType,
+        damageType: def.damageType,
+        tierType: def.tierType,
+      };
     }
 
     void session;
-    return NextResponse.json({ intersection, weaponDetails });
+    return NextResponse.json({
+      intersection,
+      weaponDetails,
+      memberCount: memberWeaponMap.size,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
