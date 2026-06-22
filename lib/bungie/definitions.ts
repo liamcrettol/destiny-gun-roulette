@@ -105,6 +105,44 @@ export async function getWeaponDefinition(
   }
 }
 
+// ── Perk name lookup (works for any DestinyInventoryItemDefinition) ───────────
+
+const perkNameCache = new Map<number, string | null>();
+
+export async function getPerkName(hash: number): Promise<string | null> {
+  if (perkNameCache.has(hash)) return perkNameCache.get(hash)!;
+  try {
+    const res = await fetch(
+      `${BUNGIE_ROOT}/Destiny2/Manifest/DestinyInventoryItemDefinition/${hash}/`,
+      {
+        headers: { "X-API-Key": process.env.BUNGIE_API_KEY! },
+        next: { revalidate: 86400 },
+      }
+    );
+    if (!res.ok) { perkNameCache.set(hash, null); return null; }
+    const data = await res.json();
+    const name: string | null = data.Response?.displayProperties?.name ?? null;
+    perkNameCache.set(hash, name);
+    return name;
+  } catch {
+    perkNameCache.set(hash, null);
+    return null;
+  }
+}
+
+export async function getPerkNames(hashes: number[]): Promise<Map<number, string>> {
+  const results = new Map<number, string>();
+  await Promise.all(
+    [...new Set(hashes)].map(async (hash) => {
+      const name = await getPerkName(hash);
+      if (name) results.set(hash, name);
+    })
+  );
+  return results;
+}
+
+// ── Batch weapon definition lookup ───────────────────────────────────────────
+
 export async function getWeaponDefinitions(
   hashes: number[]
 ): Promise<Map<number, WeaponDefinition>> {

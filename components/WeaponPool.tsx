@@ -15,9 +15,12 @@ type WeaponDetail = {
   stats: Record<string, number>;
 };
 
+type InstancePerk = { instanceId: string; perks: string[]; location: string; characterId?: string };
+
 interface Props {
   intersection: Record<WeaponSlot, number[]>;
   weaponDetails: Record<string, WeaponDetail>;
+  instancePerks: Record<string, InstancePerk[]>; // itemHash → instances with perks
   currentHashes: Partial<Record<WeaponSlot, number>>;
   onSelectWeapon: (slot: WeaponSlot, hash: number) => void;
   disabled?: boolean;
@@ -75,23 +78,26 @@ interface TooltipState {
 function FloatingTooltip({
   state,
   weaponDetails,
+  instancePerks,
 }: {
   state: TooltipState;
   weaponDetails: Record<string, WeaponDetail>;
+  instancePerks: Record<string, InstancePerk[]>;
 }) {
   const detail = weaponDetails[state.hash.toString()];
   if (!detail) return null;
 
   const barStats = BAR_STATS.filter((s) => detail.stats[s] !== undefined);
   const numStats = NUM_STATS.filter((s) => detail.stats[s] !== undefined);
+  const rolls = instancePerks[state.hash.toString()] ?? [];
 
   // Keep tooltip on screen: if cursor is in right half, shift tooltip left
-  const leftOffset = state.x > window.innerWidth / 2 ? -240 : 16;
+  const leftOffset = state.x > window.innerWidth / 2 ? -264 : 16;
   const topOffset = -8;
 
   return (
     <div
-      className="fixed z-50 w-56 bg-gray-950 border border-bungie-border rounded-xl p-3 shadow-2xl pointer-events-none"
+      className="fixed z-50 w-64 bg-gray-950 border border-bungie-border rounded-xl p-3 shadow-2xl pointer-events-none"
       style={{ left: state.x + leftOffset, top: state.y + topOffset }}
     >
       <p className="text-white text-sm font-semibold leading-tight mb-0.5">{detail.name}</p>
@@ -106,6 +112,33 @@ function FloatingTooltip({
         </span>
       </div>
 
+      {/* Per-instance perk rolls */}
+      {rolls.length > 0 && (
+        <div className="mb-3">
+          <p className="text-gray-500 text-xs uppercase tracking-wide mb-1.5">Your Rolls</p>
+          <div className="space-y-2">
+            {rolls.map((inst) => (
+              <div key={inst.instanceId} className="bg-gray-800/60 rounded-lg px-2 py-1.5">
+                <p className="text-gray-500 text-xs mb-1 capitalize">
+                  {inst.location === "vault" ? "Vault" : "On character"}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {inst.perks.map((perk) => (
+                    <span
+                      key={perk}
+                      className="text-xs bg-bungie-blue/20 border border-bungie-blue/40 text-blue-300 rounded px-1.5 py-0.5"
+                    >
+                      {perk}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Base stats */}
       {(barStats.length > 0 || numStats.length > 0) ? (
         <div className="space-y-1.5">
           {barStats.map((s) => (
@@ -146,6 +179,7 @@ function WeaponCard({
   disabled,
   onHover,
   onLeave,
+  rollCount,
 }: {
   hash: number;
   detail: WeaponDetail;
@@ -154,6 +188,7 @@ function WeaponCard({
   disabled?: boolean;
   onHover: (hash: number, x: number, y: number) => void;
   onLeave: () => void;
+  rollCount: number;
 }) {
   const tier = TIER_COLORS[detail.tierType] ?? DEFAULT_TIER;
 
@@ -192,6 +227,11 @@ function WeaponCard({
               {inlineStat} {detail.stats[inlineStat]}
             </span>
           )}
+          {rollCount > 0 && (
+            <span className="text-xs text-bungie-blue/70">
+              {rollCount} roll{rollCount > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       </div>
 
@@ -206,6 +246,7 @@ function WeaponCard({
 export default function WeaponPool({
   intersection,
   weaponDetails,
+  instancePerks,
   currentHashes,
   onSelectWeapon,
   disabled,
@@ -230,7 +271,7 @@ export default function WeaponPool({
   return (
     <>
       {/* Fixed cursor tooltip (rendered outside column flow so it can't clip) */}
-      {tooltip && <FloatingTooltip state={tooltip} weaponDetails={weaponDetails} />}
+      {tooltip && <FloatingTooltip state={tooltip} weaponDetails={weaponDetails} instancePerks={instancePerks} />}
 
       <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
         {/* Toggle header */}
@@ -279,6 +320,7 @@ export default function WeaponPool({
                               disabled={disabled}
                               onHover={handleHover}
                               onLeave={handleLeave}
+                              rollCount={instancePerks[hash.toString()]?.length ?? 0}
                             />
                           );
                         })

@@ -44,6 +44,7 @@ export default function LobbyRoom({
     name: string; icon: string; weaponType: string; damageType: string;
     tierType: number; tierName: string; ammoType: string; stats: Record<string, number>;
   }>>({});
+  const [instancePerks, setInstancePerks] = useState<Record<string, Array<{ instanceId: string; perks: string[]; location: string; characterId?: string }>>>({});
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
@@ -177,6 +178,7 @@ export default function LobbyRoom({
 
       setIntersection(data.intersection);
       setWeaponDetails(data.weaponDetails ?? {});
+      setInstancePerks(data.instancePerks ?? {});
 
       // Always seed from current equipped weapons (overwrites stale DB rolls)
       if (isCaptain && roundId) {
@@ -494,6 +496,7 @@ export default function LobbyRoom({
         <WeaponPool
           intersection={intersection}
           weaponDetails={weaponDetails}
+          instancePerks={instancePerks}
           currentHashes={Object.fromEntries(
             slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
           )}

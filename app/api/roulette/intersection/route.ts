@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { getRawWeapons } from "@/lib/bungie/rawInventory";
-import { getWeaponDefinitions } from "@/lib/bungie/definitions";
+import { getWeaponDefinitions, getPerkNames } from "@/lib/bungie/definitions";
+import { getWeaponPerkHashes } from "@/lib/bungie/sockets";
 import { z } from "zod";
 import type { WeaponSlot } from "@/types/bungie";
 
@@ -112,11 +113,63 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Fetch per-instance perk rolls for the requesting user's copies of intersection weapons.
+    // Only for weapons actually in the shared pool (not the full inventory).
+    const allIntersectionHashes = new Set([
+      ...intersection.kinetic,
+      ...intersection.energy,
+      ...intersection.power,
+    ]);
+    const myIntersectionWeapons = myWeapons.filter((w) => allIntersectionHashes.has(w.itemHash));
+    const myInstanceIds = new Set(myIntersectionWeapons.map((w) => w.itemInstanceId));
+
+    // instancePerks: itemHash → array of instances with named perks
+    const instancePerks: Record<string, Array<{
+      instanceId: string; perks: string[]; location: string; characterId?: string;
+    }>> = {};
+
+    if (myInstanceIds.size > 0) {
+      try {
+        const myMember = members.find((m) => m.user_id === session.userId);
+        if (myMember) {
+          const myToken = await getBungieToken(session.userId);
+          const perkHashMap = await getWeaponPerkHashes(
+            myMember.bungie_membership_type,
+            myMember.bungie_membership_id,
+            myToken,
+            myInstanceIds
+          );
+
+          const allPerkHashes = [...new Set([...perkHashMap.values()].flat())];
+          const perkNameMap = await getPerkNames(allPerkHashes);
+
+          for (const weapon of myIntersectionWeapons) {
+            const hashes = perkHashMap.get(weapon.itemInstanceId);
+            if (!hashes) continue;
+            const perks = hashes.map((h) => perkNameMap.get(h)).filter(Boolean) as string[];
+            if (perks.length === 0) continue;
+            const key = weapon.itemHash.toString();
+            if (!instancePerks[key]) instancePerks[key] = [];
+            instancePerks[key].push({
+              instanceId: weapon.itemInstanceId,
+              perks,
+              location: weapon.location,
+              characterId: weapon.characterId,
+            });
+          }
+        }
+      } catch (e) {
+        // Non-fatal: weapon browser still works, just without perk data
+        console.warn("Failed to fetch perk rolls:", e instanceof Error ? e.message : e);
+      }
+    }
+
     return NextResponse.json({
       intersection,
       weaponDetails,
       memberCount: memberWeaponMap.size,
       equippedHashes,
+      instancePerks,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
