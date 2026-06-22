@@ -193,17 +193,21 @@ export default function LobbyRoom({
     let keepSlots: Record<string, number> | undefined;
 
     if (rerollSlot) {
-      // Reroll one slot: keep all others that have a current value
+      // Explicit reroll of one slot: keep everything else at current value
       keepSlots = Object.fromEntries(
         slots
           .filter((s) => s.slot !== rerollSlot)
           .map((s) => [s.slot, s.item_hash])
       );
     } else {
-      // Roll All: keep locked slots at their current hash
-      const locked = slots.filter((s) => lockedSlots.has(s.slot as WeaponSlot));
-      if (locked.length > 0) {
-        keepSlots = Object.fromEntries(locked.map((s) => [s.slot, s.item_hash]));
+      // Roll All: always keep power (only changes via explicit Reroll Power),
+      // plus any slots the captain has manually locked
+      const kept = slots.filter((s) => {
+        if (s.slot === "power") return true; // always keep heavy
+        return lockedSlots.has(s.slot as WeaponSlot);
+      });
+      if (kept.length > 0) {
+        keepSlots = Object.fromEntries(kept.map((s) => [s.slot, s.item_hash]));
       }
     }
 

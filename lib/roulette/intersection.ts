@@ -45,7 +45,7 @@ const ARCHETYPE_RULES: Record<string, string[]> = {
   "Hand Cannon": ["Shotgun", "Sniper Rifle"],
 };
 
-type WeaponDetail = { weaponType: string };
+type WeaponDetail = { weaponType: string; tierType?: number };
 
 function applyPairingRule(
   pool: number[],
@@ -101,8 +101,12 @@ export function rollLoadout(
     energyHash = pick(ePool);
   }
 
-  // Power is always independent
-  const powerHash = exclude?.power ?? pick(intersection.power);
+  // Power is always independent, and never exotic (tierType 6)
+  let powerPool = intersection.power.filter(
+    (h) => (weaponDetails[h.toString()]?.tierType ?? 5) !== 6
+  );
+  if (powerPool.length === 0) powerPool = intersection.power; // fallback if all exotics
+  const powerHash = exclude?.power ?? pick(powerPool);
 
   return { kinetic: kineticHash, energy: energyHash, power: powerHash };
 }
