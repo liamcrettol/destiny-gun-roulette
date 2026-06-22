@@ -47,9 +47,10 @@ export default function LobbyRoom({
   const [lockedSlots, setLockedSlots] = useState<Set<WeaponSlot>>(new Set());
   const [wildcardSlots, setWildcardSlots] = useState<Set<WeaponSlot>>(new Set());
   const applyAbortRef = useRef<AbortController | null>(null);
-  // Keep a ref to roundId so realtime callbacks always see the current value
   const roundIdRef = useRef<string | null>(null);
   useEffect(() => { roundIdRef.current = roundId; }, [roundId]);
+  // Prevent auto-load from firing more than once per session
+  const hasAutoLoaded = useRef(false);
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
 
@@ -58,6 +59,15 @@ export default function LobbyRoom({
       .then((r) => r.json())
       .then((d) => { if (d.characters) setCharacters(d.characters); });
   }, []);
+
+  // Auto-load intersection + seed roll for the captain when the lobby first opens
+  useEffect(() => {
+    if (hasAutoLoaded.current) return;
+    if (!isCaptain || !roundId || slots.length > 0) return;
+    hasAutoLoaded.current = true;
+    handleLoadIntersection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCaptain, roundId, slots.length]);
 
   useEffect(() => {
     async function loadCurrentRound() {
