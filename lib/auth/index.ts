@@ -100,10 +100,10 @@ export const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      session.userId = token.userId;
-      session.bungieMembershipId = token.bungieMembershipId;
-      session.bungieMembershipType = token.bungieMembershipType;
-      session.displayName = token.displayName;
+      session.userId = token.userId as string;
+      session.bungieMembershipId = token.bungieMembershipId as string;
+      session.bungieMembershipType = token.bungieMembershipType as number;
+      session.displayName = token.displayName as string;
       return session;
     },
   },
