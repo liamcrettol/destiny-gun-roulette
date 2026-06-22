@@ -63,13 +63,17 @@ export async function applyWeapons(
           } satisfies TransferItemRequest
         );
       } catch (err) {
+        const raw = err instanceof Error ? err.message : "Transfer failed";
+        const friendly = raw.includes("1642") || raw.toLowerCase().includes("no room")
+          ? "Inventory full — clear a weapon slot on your character first"
+          : raw;
         results.push({
           user_id: userId,
           display_name: displayName,
           slot: weapon.slot,
           item_hash: weapon.itemHash,
           success: false,
-          error: err instanceof Error ? err.message : "Transfer failed",
+          error: friendly,
         });
       }
     }

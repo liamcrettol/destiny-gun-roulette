@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
-import { getWeapons } from "@/lib/bungie/inventory";
-import { ensureManifest } from "@/lib/manifest/lookup";
-import { findBestInstance } from "@/lib/roulette/intersection";
+import { getRawWeapons, type RawWeapon } from "@/lib/bungie/rawInventory";
 import { applyWeapons } from "@/lib/bungie/equip";
 import type { WeaponToApply } from "@/lib/bungie/equip";
 import { z } from "zod";
@@ -14,12 +12,23 @@ const schema = z.object({
   characterId: z.string(),
 });
 
+function findBestInstance(itemHash: number, weapons: RawWeapon[]): RawWeapon | null {
+  const candidates = weapons
+    .filter((w) => w.itemHash === itemHash)
+    .sort((a, b) => b.lightLevel - a.lightLevel); // highest light level first
+  if (candidates.length === 0) return null;
+  return (
+    candidates.find((w) => w.isEquipped) ??
+    candidates.find((w) => w.location === "character") ??
+    candidates[0]
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     const body = schema.parse(await req.json());
 
-    // Get the locked slots for this round
     const { data: slots } = await adminSupabase
       .from("lobby_loadout_slots")
       .select("*")
@@ -29,22 +38,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No loadout rolled yet" }, { status: 400 });
     }
 
-    // Get this user's weapons to find their instance of each shared hash
-    await ensureManifest();
     const token = await getBungieToken(session.userId);
-    const myWeapons = await getWeapons(
+    const myWeapons = await getRawWeapons(
       session.bungieMembershipType,
       session.bungieMembershipId,
       token
     );
 
-    // Build the weapons-to-apply list
     const weaponsToApply: WeaponToApply[] = [];
-
     for (const slot of slots) {
       const best = findBestInstance(slot.item_hash, myWeapons);
-      if (!best) continue; // User doesn't own this weapon — will show as failed
-
+      if (!best) continue;
       weaponsToApply.push({
         itemHash: best.itemHash,
         itemInstanceId: best.itemInstanceId,
@@ -63,12 +67,11 @@ export async function POST(req: NextRequest) {
       session.displayName
     );
 
-    // Persist results to roll_history
     await adminSupabase.from("roll_history").upsert(
       {
         lobby_id: body.lobbyId,
         round_id: body.roundId,
-        round_number: 0, // caller can supply actual round
+        round_number: 0,
         applied_at: new Date().toISOString(),
         apply_results: results,
       },

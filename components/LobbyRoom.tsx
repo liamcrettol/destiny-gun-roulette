@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Lobby, LobbyMember, LobbyLoadoutSlot } from "@/types/lobby";
 import type { DestinyCharacter } from "@/types/bungie";
@@ -20,6 +21,7 @@ interface Props {
 }
 
 const CLASS_NAMES: Record<number, string> = { 0: "Titan", 1: "Hunter", 2: "Warlock" };
+const SLOT_LABELS: Record<WeaponSlot, string> = { kinetic: "Kinetic", energy: "Energy", power: "Power" };
 
 export default function LobbyRoom({
   lobby,
@@ -28,6 +30,7 @@ export default function LobbyRoom({
   bungieMembershipType,
   bungieMembershipId,
 }: Props) {
+  const router = useRouter();
   const supabase = createClient();
   const [members, setMembers] = useState<LobbyMember[]>(initialMembers);
   const [characters, setCharacters] = useState<DestinyCharacter[]>([]);
@@ -40,20 +43,17 @@ export default function LobbyRoom({
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
+  // Slots locked to their current rolled weapon — excluded from Roll All
+  const [lockedSlots, setLockedSlots] = useState<Set<WeaponSlot>>(new Set());
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
-  const me = members.find((m) => m.user_id === currentUserId);
 
-  // Load characters on mount
   useEffect(() => {
     fetch("/api/bungie/characters")
       .then((r) => r.json())
-      .then((d) => {
-        if (d.characters) setCharacters(d.characters);
-      });
+      .then((d) => { if (d.characters) setCharacters(d.characters); });
   }, []);
 
-  // Load current round's slots
   useEffect(() => {
     async function loadCurrentRound() {
       const { data: round } = await supabase
@@ -74,7 +74,6 @@ export default function LobbyRoom({
     loadCurrentRound();
   }, [lobby.id, lobby.current_round, supabase]);
 
-  // Supabase realtime subscriptions
   useEffect(() => {
     const channel = supabase
       .channel(`lobby:${lobby.id}`)
@@ -86,6 +85,8 @@ export default function LobbyRoom({
             setMembers((prev) => [...prev.filter((m) => m.id !== (payload.new as LobbyMember).id), payload.new as LobbyMember]);
           } else if (payload.eventType === "UPDATE") {
             setMembers((prev) => prev.map((m) => m.id === (payload.new as LobbyMember).id ? payload.new as LobbyMember : m));
+          } else if (payload.eventType === "DELETE") {
+            setMembers((prev) => prev.filter((m) => m.id !== (payload.old as LobbyMember).id));
           }
         }
       )
@@ -103,6 +104,16 @@ export default function LobbyRoom({
 
     return () => { supabase.removeChannel(channel); };
   }, [lobby.id, supabase]);
+
+  const handleLeave = useCallback(async () => {
+    await fetch("/api/lobby/leave", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lobbyId: lobby.id }),
+    });
+    router.push("/dashboard");
+    router.refresh();
+  }, [lobby.id, router]);
 
   const handleReady = useCallback(async () => {
     if (!selectedCharId) return;
@@ -138,19 +149,43 @@ export default function LobbyRoom({
     setLoadingAction(null);
   }, [lobby.id]);
 
+  const toggleLock = useCallback((slot: WeaponSlot) => {
+    setLockedSlots((prev) => {
+      const next = new Set(prev);
+      if (next.has(slot)) next.delete(slot);
+      else next.add(slot);
+      return next;
+    });
+  }, []);
+
   const handleRoll = useCallback(async (rerollSlot?: WeaponSlot) => {
     if (!intersection || !roundId) return;
     setLoadingAction("roll");
-    const keepSlots = rerollSlot
-      ? Object.fromEntries(slots.filter((s) => s.slot !== rerollSlot).map((s) => [s.slot, s.item_hash]))
-      : undefined;
+
+    let keepSlots: Record<string, number> | undefined;
+
+    if (rerollSlot) {
+      // Reroll one slot: keep all others that have a current value
+      keepSlots = Object.fromEntries(
+        slots
+          .filter((s) => s.slot !== rerollSlot)
+          .map((s) => [s.slot, s.item_hash])
+      );
+    } else {
+      // Roll All: keep locked slots at their current hash
+      const locked = slots.filter((s) => lockedSlots.has(s.slot as WeaponSlot));
+      if (locked.length > 0) {
+        keepSlots = Object.fromEntries(locked.map((s) => [s.slot, s.item_hash]));
+      }
+    }
+
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lobbyId: lobby.id, roundId, intersection, weaponDetails, rerollSlot, keepSlots }),
     });
     setLoadingAction(null);
-  }, [intersection, roundId, lobby.id, slots, weaponDetails]);
+  }, [intersection, roundId, lobby.id, slots, weaponDetails, lockedSlots]);
 
   const handleApply = useCallback(async () => {
     if (!selectedCharId || !roundId) return;
@@ -184,6 +219,12 @@ export default function LobbyRoom({
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400">Round {lobby.current_round}</span>
+          <button
+            onClick={handleLeave}
+            className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition"
+          >
+            Leave
+          </button>
           <SignOutButton />
         </div>
       </div>
@@ -232,9 +273,7 @@ export default function LobbyRoom({
             onClick={handleReady}
             disabled={!selectedCharId || loadingAction === "ready"}
             className={`mt-3 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-              isReady
-                ? "bg-green-700 text-white"
-                : "bg-bungie-blue text-white hover:opacity-90"
+              isReady ? "bg-green-700 text-white" : "bg-bungie-blue text-white hover:opacity-90"
             } disabled:opacity-50`}
           >
             {loadingAction === "ready" ? "…" : isReady ? "✓ Ready" : "Mark Ready"}
@@ -270,16 +309,41 @@ export default function LobbyRoom({
                     disabled={loadingAction !== null}
                     className="px-3 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-xs text-gray-300 hover:border-gray-400 disabled:opacity-50 transition capitalize"
                   >
-                    Reroll {slot}
+                    Reroll {SLOT_LABELS[slot]}
                   </button>
                 ))}
               </>
             )}
           </div>
-          {intersectionError && (
-            <div className="mt-2 text-xs text-red-400 break-all">
-              Error: {intersectionError}
+
+          {/* Lock slots — only shown once a roll exists */}
+          {intersection && slots.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
+              <span className="text-xs text-gray-500">Lock slot (skip on Roll All):</span>
+              {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => {
+                const locked = lockedSlots.has(slot);
+                const currentSlot = slots.find((s) => s.slot === slot);
+                return (
+                  <button
+                    key={slot}
+                    onClick={() => toggleLock(slot)}
+                    disabled={!currentSlot}
+                    title={currentSlot ? `Lock ${SLOT_LABELS[slot]} to current weapon` : "Roll first"}
+                    className={`px-2.5 py-1 rounded text-xs border transition ${
+                      locked
+                        ? "border-yellow-500 bg-yellow-500/20 text-yellow-300"
+                        : "border-bungie-border text-gray-400 hover:border-gray-400"
+                    } disabled:opacity-30`}
+                  >
+                    {locked ? "🔒" : "🔓"} {SLOT_LABELS[slot]}
+                  </button>
+                );
+              })}
             </div>
+          )}
+
+          {intersectionError && (
+            <div className="mt-2 text-xs text-red-400 break-all">Error: {intersectionError}</div>
           )}
           {intersection && (
             <div className="mt-2 text-xs text-gray-400">
