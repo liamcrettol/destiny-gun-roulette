@@ -38,6 +38,7 @@ export default function LobbyRoom({
   const [weaponDetails, setWeaponDetails] = useState<Record<string, { name: string; icon: string; weaponType: string; damageType: string }>>({});
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [intersectionError, setIntersectionError] = useState<string | null>(null);
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
   const me = members.find((m) => m.user_id === currentUserId);
@@ -116,15 +117,22 @@ export default function LobbyRoom({
 
   const handleLoadIntersection = useCallback(async () => {
     setLoadingAction("intersection");
-    const res = await fetch("/api/roulette/intersection", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lobbyId: lobby.id }),
-    });
-    const data = await res.json();
-    if (data.intersection) {
-      setIntersection(data.intersection);
-      setWeaponDetails(data.weaponDetails ?? {});
+    setIntersectionError(null);
+    try {
+      const res = await fetch("/api/roulette/intersection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lobbyId: lobby.id }),
+      });
+      const data = await res.json();
+      if (data.intersection) {
+        setIntersection(data.intersection);
+        setWeaponDetails(data.weaponDetails ?? {});
+      } else {
+        setIntersectionError(data.error ?? "Unknown error loading shared weapons");
+      }
+    } catch (e) {
+      setIntersectionError(e instanceof Error ? e.message : "Network error");
     }
     setLoadingAction(null);
   }, [lobby.id]);
@@ -264,6 +272,11 @@ export default function LobbyRoom({
               </>
             )}
           </div>
+          {intersectionError && (
+            <div className="mt-2 text-xs text-red-400 break-all">
+              Error: {intersectionError}
+            </div>
+          )}
           {intersection && (
             <div className="mt-2 text-xs text-gray-400">
               Shared pool — Kinetic: {intersection.kinetic.length} · Energy:{" "}
