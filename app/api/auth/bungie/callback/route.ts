@@ -14,11 +14,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${BASE_URL}/auth/error?error=${encodeURIComponent(error)}`);
   }
 
-  // Validate CSRF state
-  const savedState = req.cookies.get("bungie_oauth_state")?.value;
-  if (!state || !savedState || state !== savedState) {
+  // Validate CSRF state against DB
+  if (!state) {
     return NextResponse.redirect(`${BASE_URL}/auth/error?error=state_mismatch`);
   }
+  const { data: storedState } = await adminSupabase
+    .from("oauth_states")
+    .select("state")
+    .eq("state", state)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+  if (!storedState) {
+    return NextResponse.redirect(`${BASE_URL}/auth/error?error=state_mismatch`);
+  }
+  // Delete immediately — one-time use
+  await adminSupabase.from("oauth_states").delete().eq("state", state);
   if (!code) {
     return NextResponse.redirect(`${BASE_URL}/auth/error?error=no_code`);
   }
@@ -103,8 +113,5 @@ export async function GET(req: NextRequest) {
     expires_at: new Date(Date.now() + 2 * 60 * 1000).toISOString(), // 2 min
   });
 
-  const response = NextResponse.redirect(`${BASE_URL}/auth/complete?code=${authCode}`);
-  // Clear the state cookie
-  response.cookies.set("bungie_oauth_state", "", { maxAge: 0, path: "/" });
-  return response;
+  return NextResponse.redirect(`${BASE_URL}/auth/complete?code=${authCode}`);
 }

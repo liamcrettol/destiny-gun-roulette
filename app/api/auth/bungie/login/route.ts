@@ -1,23 +1,20 @@
 import { NextResponse } from "next/server";
+import { adminSupabase } from "@/lib/supabase/admin";
 
-// Custom Bungie OAuth initiation — does NOT send scope param (Bungie rejects it).
-// NextAuth's built-in OAuth provider always appends scope, so we handle this ourselves.
 export async function GET() {
   const state = crypto.randomUUID();
+
+  // Store state in DB — cookies aren't reliable across serverless redirects
+  await adminSupabase.from("oauth_states").insert({
+    state,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+  });
 
   const authUrl = new URL("https://www.bungie.net/en/OAuth/Authorize");
   authUrl.searchParams.set("client_id", process.env.BUNGIE_CLIENT_ID!);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
-  // Do NOT add scope — Bungie pre-configures it and rejects any scope param
+  // Do NOT add scope — Bungie rejects any scope parameter
 
-  const response = NextResponse.redirect(authUrl.toString());
-  response.cookies.set("bungie_oauth_state", state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 600,
-    path: "/",
-  });
-  return response;
+  return NextResponse.redirect(authUrl.toString());
 }
