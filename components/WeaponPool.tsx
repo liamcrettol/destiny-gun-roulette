@@ -23,7 +23,7 @@ interface Props {
   instancePerks: Record<string, InstancePerk[]>;
   collectionHashes: Set<number>;
   currentHashes: Partial<Record<WeaponSlot, number>>;
-  onSelectWeapon: (slot: WeaponSlot, hash: number) => void;
+  onSelectWeapon: (slot: WeaponSlot, hash: number, instanceId?: string) => void;
   disabled?: boolean;
 }
 
@@ -167,80 +167,125 @@ function FloatingTooltip({
 // ── Weapon card ─────────────────────────────────────────────────────────────
 
 function WeaponCard({
-  hash, detail, isActive, isCollection, perks, onClick, disabled, onHover, onLeave,
+  hash, detail, isActive, isCollection, rolls, slot, onSelect, disabled, onHover, onLeave,
 }: {
   hash: number; detail: WeaponDetail; isActive: boolean; isCollection: boolean;
-  perks: string[]; onClick: () => void; disabled?: boolean;
+  rolls: InstancePerk[]; slot: WeaponSlot;
+  onSelect: (hash: number, instanceId?: string) => void;
+  disabled?: boolean;
   onHover: (hash: number, x: number, y: number) => void; onLeave: () => void;
 }) {
+  const [rollsOpen, setRollsOpen] = useState(false);
   const tier = TIER_COLORS[detail.tierType] ?? DEFAULT_TIER;
   const inlineStat = CARD_INLINE_STATS.find((s) => detail.stats[s] !== undefined);
+  const bestRoll = rolls.find((r) => r.location !== "vault") ?? rolls[0];
 
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      onMouseMove={(e) => onHover(hash, e.clientX, e.clientY)}
+    <div
+      className={`rounded-lg border overflow-hidden ${
+        isActive ? "border-bungie-blue" : tier.border
+      }`}
       onMouseLeave={onLeave}
-      className={`w-full flex items-start gap-3 p-3 rounded-lg border text-left transition ${
-        isActive
-          ? "border-bungie-blue bg-bungie-blue/20 shadow-sm shadow-bungie-blue/20"
-          : `${tier.border} ${tier.bg} hover:brightness-125`
-      } disabled:opacity-40 disabled:cursor-default`}
     >
-      {/* Icon */}
-      <div className="relative w-12 h-12 shrink-0 rounded overflow-hidden bg-gray-800">
-        {detail.icon && (
-          <Image src={detail.icon} alt={detail.name} fill className="object-cover" unoptimized />
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="min-w-0 flex-1">
-        {/* Name row */}
-        <div className="flex items-start justify-between gap-1 mb-0.5">
-          <p className="text-white text-xs font-semibold leading-tight">{detail.name}</p>
-          <div className="flex items-center gap-1 shrink-0">
-            {isCollection && (
-              <span className="text-xs bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded px-1 py-0.5 leading-none">
-                C
-              </span>
-            )}
-            {isActive && <span className="text-bungie-blue text-sm leading-none">✓</span>}
-          </div>
-        </div>
-
-        {/* Type + damage + stat */}
-        <p className="text-gray-400 text-xs leading-tight truncate">{detail.weaponType}</p>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className={`text-xs ${DAMAGE_COLOR[detail.damageType] ?? "text-gray-400"}`}>
-            {detail.damageType}
-          </span>
-          {inlineStat && (
-            <span className="text-gray-500 text-xs tabular-nums">
-              {inlineStat} {detail.stats[inlineStat]}
-            </span>
+      {/* Main card row */}
+      <button
+        onClick={() => onSelect(hash)}
+        disabled={disabled}
+        onMouseMove={(e) => onHover(hash, e.clientX, e.clientY)}
+        className={`w-full flex items-start gap-3 p-3 text-left transition ${
+          isActive ? "bg-bungie-blue/20" : `${tier.bg} hover:brightness-125`
+        } disabled:opacity-40 disabled:cursor-default`}
+      >
+        <div className="relative w-12 h-12 shrink-0 rounded overflow-hidden bg-gray-800">
+          {detail.icon && (
+            <Image src={detail.icon} alt={detail.name} fill className="object-cover" unoptimized />
           )}
         </div>
-
-        {/* Perk pills — shown inline if available */}
-        {perks.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {perks.slice(0, 3).map((perk) => (
-              <span
-                key={perk}
-                className="text-xs bg-gray-700/60 border border-gray-600/40 text-gray-300 rounded px-1.5 py-0.5 leading-none"
-              >
-                {perk}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-1 mb-0.5">
+            <p className="text-white text-xs font-semibold leading-tight">{detail.name}</p>
+            <div className="flex items-center gap-1 shrink-0">
+              {isCollection && (
+                <span className="text-xs bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded px-1 py-0.5 leading-none">
+                  C
+                </span>
+              )}
+              {isActive && <span className="text-bungie-blue text-sm leading-none">✓</span>}
+            </div>
+          </div>
+          <p className="text-gray-400 text-xs leading-tight truncate">{detail.weaponType}</p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className={`text-xs ${DAMAGE_COLOR[detail.damageType] ?? "text-gray-400"}`}>
+              {detail.damageType}
+            </span>
+            {inlineStat && (
+              <span className="text-gray-500 text-xs tabular-nums">
+                {inlineStat} {detail.stats[inlineStat]}
               </span>
-            ))}
-            {perks.length > 3 && (
-              <span className="text-xs text-gray-500 px-0.5 py-0.5">+{perks.length - 3}</span>
             )}
           </div>
-        )}
-      </div>
-    </button>
+          {bestRoll && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {bestRoll.perks.slice(0, 3).map((perk) => (
+                <span
+                  key={perk}
+                  className="text-xs bg-gray-700/60 border border-gray-600/40 text-gray-300 rounded px-1.5 py-0.5 leading-none"
+                >
+                  {perk}
+                </span>
+              ))}
+              {bestRoll.perks.length > 3 && (
+                <span className="text-xs text-gray-500 self-center">+{bestRoll.perks.length - 3}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </button>
+
+      {/* Roll picker toggle — only shown when multiple rolls exist */}
+      {rolls.length > 1 && (
+        <div className="border-t border-bungie-border/50">
+          <button
+            onClick={() => setRollsOpen((v) => !v)}
+            disabled={disabled}
+            className="w-full px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition flex items-center justify-between"
+          >
+            <span>{rolls.length} rolls — pick one</span>
+            <span>{rollsOpen ? "▲" : "▼"}</span>
+          </button>
+          {rollsOpen && (
+            <div className="px-2 pb-2 space-y-1.5 bg-gray-900/40">
+              {rolls.map((inst, i) => (
+                <div key={inst.instanceId} className="flex items-center gap-2 bg-gray-800/50 rounded-lg px-2 py-1.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-gray-500 text-xs mb-1 capitalize">
+                      Roll {i + 1} · {inst.location === "vault" ? "Vault" : "On character"}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {inst.perks.map((perk) => (
+                        <span
+                          key={perk}
+                          className="text-xs bg-bungie-blue/20 border border-bungie-blue/40 text-blue-300 rounded px-1.5 py-0.5 leading-none"
+                        >
+                          {perk}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { onSelect(hash, inst.instanceId); setRollsOpen(false); }}
+                    disabled={disabled}
+                    className="shrink-0 text-xs px-2 py-1 rounded bg-bungie-blue/80 hover:bg-bungie-blue text-white transition disabled:opacity-40"
+                  >
+                    Use
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -250,6 +295,7 @@ export default function WeaponPool({
   intersection, weaponDetails, instancePerks, collectionHashes, currentHashes, onSelectWeapon, disabled,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const handleHover = useCallback((hash: number, x: number, y: number) => {
@@ -257,11 +303,12 @@ export default function WeaponPool({
   }, []);
   const handleLeave = useCallback(() => setTooltip(null), []);
 
-  useEffect(() => { if (!open) setTooltip(null); }, [open]);
+  useEffect(() => { if (!open) { setTooltip(null); setSearch(""); } }, [open]);
 
   const slotList: WeaponSlot[] = ["kinetic", "energy", "power"];
   const totalWeapons = slotList.reduce((n, s) => n + intersection[s].length, 0);
   const collectionCount = collectionHashes.size;
+  const query = search.toLowerCase().trim();
 
   return (
     <>
@@ -294,27 +341,43 @@ export default function WeaponPool({
 
         {open && (
           <div className="px-4 pb-4">
+            {/* Search */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search weapons…"
+                className="w-full bg-bungie-dark border border-bungie-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-bungie-blue transition"
+              />
+            </div>
+
             <div className="grid grid-cols-3 gap-4">
               {slotList.map((slot) => {
                 const sorted = sortWeapons(intersection[slot], weaponDetails);
+                const filtered = query
+                  ? sorted.filter((h) => weaponDetails[h.toString()]?.name.toLowerCase().includes(query))
+                  : sorted;
                 const activeHash = currentHashes[slot];
                 return (
                   <div key={slot} className="min-w-0">
                     <div className="flex items-center gap-2 mb-3 pb-2 border-b border-bungie-border">
                       <span className="text-sm font-bold text-white">{SLOT_LABELS[slot]}</span>
-                      <span className="text-gray-500 text-xs">{sorted.length}</span>
+                      <span className="text-gray-500 text-xs">
+                        {filtered.length}{query && filtered.length !== sorted.length ? ` / ${sorted.length}` : ""}
+                      </span>
                     </div>
 
                     <div className="space-y-2">
-                      {sorted.length === 0 ? (
-                        <p className="text-gray-600 text-xs py-2">No shared weapons</p>
+                      {filtered.length === 0 ? (
+                        <p className="text-gray-600 text-xs py-2">
+                          {query ? "No matches" : "No shared weapons"}
+                        </p>
                       ) : (
-                        sorted.map((hash) => {
+                        filtered.map((hash) => {
                           const detail = weaponDetails[hash.toString()];
                           if (!detail) return null;
-                          // Collect best perk roll to show inline (prefer on-character over vault)
                           const rolls = instancePerks[hash.toString()] ?? [];
-                          const bestRoll = rolls.find((r) => r.location !== "vault") ?? rolls[0];
                           return (
                             <WeaponCard
                               key={hash}
@@ -322,8 +385,9 @@ export default function WeaponPool({
                               detail={detail}
                               isActive={activeHash === hash}
                               isCollection={collectionHashes.has(hash)}
-                              perks={bestRoll?.perks ?? []}
-                              onClick={() => onSelectWeapon(slot, hash)}
+                              rolls={rolls}
+                              slot={slot}
+                              onSelect={(h, instanceId) => onSelectWeapon(slot, h, instanceId)}
                               disabled={disabled}
                               onHover={handleHover}
                               onLeave={handleLeave}

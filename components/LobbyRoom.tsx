@@ -46,6 +46,8 @@ export default function LobbyRoom({
   }>>({});
   const [instancePerks, setInstancePerks] = useState<Record<string, Array<{ instanceId: string; perks: string[]; location: string; characterId?: string }>>>({});
   const [collectionHashes, setCollectionHashes] = useState<Set<number>>(new Set());
+  // Captain's preferred instanceId per slot — overrides findBestInstance heuristic on apply
+  const [preferredInstances, setPreferredInstances] = useState<Partial<Record<WeaponSlot, string>>>({});
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
@@ -281,7 +283,7 @@ export default function LobbyRoom({
       const res = await fetch("/api/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lobbyId: lobby.id, roundId, characterId: selectedCharId }),
+        body: JSON.stringify({ lobbyId: lobby.id, roundId, characterId: selectedCharId, preferredInstances }),
         signal: controller.signal,
       });
       const data = await res.json();
@@ -299,12 +301,18 @@ export default function LobbyRoom({
     setLoadingAction(null);
   }, []);
 
-  // Pin a specific weapon hash to a slot — keeps all other slots unchanged
-  const handleSelectWeapon = useCallback(async (slot: WeaponSlot, hash: number) => {
+  // Pin a specific weapon hash (and optionally a specific instance/roll) to a slot
+  const handleSelectWeapon = useCallback(async (slot: WeaponSlot, hash: number, instanceId?: string) => {
     if (!intersection || !roundId) return;
     setLoadingAction("roll");
 
-    // Build keepSlots from current rolled slots, overriding just the chosen slot
+    // Store the preferred instance if captain picked a specific roll
+    if (instanceId) {
+      setPreferredInstances((prev) => ({ ...prev, [slot]: instanceId }));
+    } else {
+      setPreferredInstances((prev) => { const n = { ...prev }; delete n[slot]; return n; });
+    }
+
     const keep: Partial<Record<WeaponSlot, number>> = {};
     for (const s of slots) {
       if (s.item_hash !== 0) keep[s.slot as WeaponSlot] = s.item_hash;
@@ -314,13 +322,7 @@ export default function LobbyRoom({
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lobbyId: lobby.id,
-        roundId,
-        intersection,
-        weaponDetails,
-        keepSlots: keep,
-      }),
+      body: JSON.stringify({ lobbyId: lobby.id, roundId, intersection, weaponDetails, keepSlots: keep }),
     });
     setLoadingAction(null);
   }, [intersection, roundId, lobby.id, slots, weaponDetails]);
@@ -503,7 +505,7 @@ export default function LobbyRoom({
           currentHashes={Object.fromEntries(
             slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
           )}
-          onSelectWeapon={handleSelectWeapon}
+          onSelectWeapon={(slot, hash, instanceId) => handleSelectWeapon(slot, hash, instanceId)}
           disabled={loadingAction !== null}
         />
       )}

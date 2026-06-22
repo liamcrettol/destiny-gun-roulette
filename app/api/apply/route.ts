@@ -10,14 +10,25 @@ const schema = z.object({
   lobbyId: z.string().uuid(),
   roundId: z.string().uuid(),
   characterId: z.string(),
+  // Captain-chosen instanceId per slot (overrides findBestInstance heuristic)
+  preferredInstances: z.record(z.string(), z.string()).optional(),
 });
 
-function findBestInstance(itemHash: number, weapons: RawWeapon[], targetCharacterId: string): RawWeapon | null {
+function findBestInstance(
+  itemHash: number,
+  weapons: RawWeapon[],
+  targetCharacterId: string,
+  preferredInstanceId?: string
+): RawWeapon | null {
   const candidates = weapons.filter((w) => w.itemHash === itemHash);
   if (candidates.length === 0) return null;
 
-  // Priority: on target char (0 transfers) > vault (1 transfer) > other char (2 transfers)
-  // Within the same priority tier, prefer highest light level
+  // Honor captain's chosen roll if it exists in this user's inventory
+  if (preferredInstanceId) {
+    const preferred = candidates.find((w) => w.itemInstanceId === preferredInstanceId);
+    if (preferred) return preferred;
+  }
+
   const transferCost = (w: RawWeapon) => {
     if (w.characterId === targetCharacterId) return 0;
     if (w.location === "vault") return 1;
@@ -34,6 +45,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     const body = schema.parse(await req.json());
+    const preferredInstances = body.preferredInstances ?? {};
 
     const { data: slots } = await adminSupabase
       .from("lobby_loadout_slots")
@@ -54,7 +66,7 @@ export async function POST(req: NextRequest) {
     const weaponsToApply: WeaponToApply[] = [];
     for (const slot of slots) {
       if (slot.item_hash === 0) continue; // wildcard — player keeps their own weapon
-      const best = findBestInstance(slot.item_hash, myWeapons, body.characterId);
+      const best = findBestInstance(slot.item_hash, myWeapons, body.characterId, preferredInstances[slot.slot]);
       if (!best) continue;
       weaponsToApply.push({
         itemHash: best.itemHash,
