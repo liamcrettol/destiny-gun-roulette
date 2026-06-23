@@ -16,7 +16,7 @@ export default async function Leaderboard() {
   if (!data?.length) {
     return (
       <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6 text-center">
-        <p className="text-gray-500 text-sm">No games played yet — be the first!</p>
+        <p className="text-gray-500 text-sm">No games yet.</p>
       </div>
     );
   }
@@ -46,7 +46,7 @@ export default async function Leaderboard() {
 
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6">
-      <h2 className="text-lg font-semibold text-white mb-4">Global Leaderboard</h2>
+      <h2 className="text-lg font-semibold text-white mb-4">Leaderboard</h2>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
