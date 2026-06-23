@@ -76,11 +76,19 @@ export function rollLoadout(
   weaponDetails: Record<string, WeaponDetail>,
   exclude?: Partial<Record<WeaponSlot, number>>
 ): Record<WeaponSlot, number | null> {
-  const kineticKept = exclude?.kinetic !== undefined;
-  const energyKept = exclude?.energy !== undefined;
+  // Treat 0 (the "your own / wildcard" sentinel) as not-kept so it can never pin
+  // a slot to an empty value — a kept slot must be a real item hash.
+  const keep: Partial<Record<WeaponSlot, number>> = {};
+  for (const s of ["kinetic", "energy", "power"] as WeaponSlot[]) {
+    const v = exclude?.[s];
+    if (v !== undefined && v !== 0) keep[s] = v;
+  }
 
-  let kineticHash: number | null = exclude?.kinetic ?? null;
-  let energyHash: number | null = exclude?.energy ?? null;
+  const kineticKept = keep.kinetic !== undefined;
+  const energyKept = keep.energy !== undefined;
+
+  let kineticHash: number | null = keep.kinetic ?? null;
+  let energyHash: number | null = keep.energy ?? null;
 
   // Roll kinetic first (if not locked)
   if (!kineticKept) {
@@ -106,7 +114,7 @@ export function rollLoadout(
     (h) => (weaponDetails[h.toString()]?.tierType ?? 5) !== 6
   );
   if (powerPool.length === 0) powerPool = intersection.power; // fallback if all exotics
-  const powerHash = exclude?.power ?? pick(powerPool);
+  const powerHash = keep.power ?? pick(powerPool);
 
   return { kinetic: kineticHash, energy: energyHash, power: powerHash };
 }

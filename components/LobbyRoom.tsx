@@ -343,21 +343,55 @@ export default function LobbyRoom({
     setLoadingAction(null);
   }, [lobby.id, isCaptain, slots.length, roundId, selectedCharId]);
 
+  // Write a roll for an explicit wildcard set (avoids stale wildcardSlots state).
+  // Keeps every slot's current real weapon except wildcards, the sentinel 0, and
+  // an optional slot being rerolled.
+  const rollWithModes = useCallback(async (nextWildcards: Set<WeaponSlot>, rerollSlot?: WeaponSlot) => {
+    if (!intersection || !roundId) return;
+    setLoadingAction("roll");
+    const keep: Record<string, number> = {};
+    for (const s of slots) {
+      const sl = s.slot as WeaponSlot;
+      if (nextWildcards.has(sl)) continue;
+      if (sl === rerollSlot) continue;
+      if (s.item_hash === 0) continue;
+      keep[sl] = s.item_hash;
+    }
+    await fetch("/api/roulette/roll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lobbyId: lobby.id, roundId, intersection, weaponDetails,
+        keepSlots: Object.keys(keep).length > 0 ? keep : undefined,
+        wildcardSlots: Array.from(nextWildcards),
+      }),
+    });
+    setLoadingAction(null);
+  }, [intersection, roundId, lobby.id, slots, weaponDetails]);
+
   // Cycle a slot through Random → 🔒 Locked → 👤 Your own → Random.
   // Locked = keep this shared weapon on Roll All. Your own = skip slot on apply
-  // (each player keeps their own equipped weapon).
+  // (each player keeps their own equipped weapon). Toggling on/off "Your own"
+  // writes the change immediately so the slot grays / repopulates right away.
   const cycleSlotMode = useCallback((slot: WeaponSlot) => {
     const locked = lockedSlots.has(slot);
     const wildcard = wildcardSlots.has(slot);
     if (!locked && !wildcard) {
+      // Random -> Locked (no roll; current weapon stays, now pinned)
       setLockedSlots((prev) => new Set(prev).add(slot));
     } else if (locked) {
+      // Locked -> Your own (write the sentinel so it grays + skips on apply)
       setLockedSlots((prev) => { const n = new Set(prev); n.delete(slot); return n; });
-      setWildcardSlots((prev) => new Set(prev).add(slot));
+      const next = new Set(wildcardSlots).add(slot);
+      setWildcardSlots(next);
+      rollWithModes(next);
     } else {
-      setWildcardSlots((prev) => { const n = new Set(prev); n.delete(slot); return n; });
+      // Your own -> Random (reroll this slot back to a real weapon)
+      const next = new Set(wildcardSlots); next.delete(slot);
+      setWildcardSlots(next);
+      rollWithModes(next, slot);
     }
-  }, [lockedSlots, wildcardSlots]);
+  }, [lockedSlots, wildcardSlots, rollWithModes]);
 
   const handleRoll = useCallback(async (rerollSlot?: WeaponSlot) => {
     if (!intersection || !roundId) return;
@@ -369,10 +403,13 @@ export default function LobbyRoom({
     let keepSlots: Record<string, number> | undefined;
     if (rerollSlot) {
       keepSlots = Object.fromEntries(
-        slots.filter((s) => s.slot !== rerollSlot && !effectiveWildcards.has(s.slot as WeaponSlot)).map((s) => [s.slot, s.item_hash])
+        slots
+          .filter((s) => s.slot !== rerollSlot && !effectiveWildcards.has(s.slot as WeaponSlot) && s.item_hash !== 0)
+          .map((s) => [s.slot, s.item_hash])
       );
     } else {
       const kept = slots.filter((s) => {
+        if (s.item_hash === 0) return false; // never keep the wildcard sentinel
         if (effectiveWildcards.has(s.slot as WeaponSlot)) return false;
         if (s.slot === "power") return true;
         return lockedSlots.has(s.slot as WeaponSlot);
