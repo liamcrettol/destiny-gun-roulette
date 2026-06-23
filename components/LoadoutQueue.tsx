@@ -25,26 +25,29 @@ export default function LoadoutQueue({ slots, onApply, onCancelApply, selectedCh
 
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-      <h2 className="text-white font-semibold mb-4">Current Roll</h2>
+      <h2 className="text-white font-semibold mb-4">Current Loadout</h2>
       <div className="grid grid-cols-3 gap-3 mb-4">
         {SLOT_ORDER.map((slotName) => {
           const slot = sorted.find((s) => s.slot === slotName);
+          const isWildcard = slot?.item_hash === 0;
           return (
             <div
               key={slotName}
-              className="flex flex-col items-center gap-2 bg-bungie-dark rounded-lg p-3 border border-bungie-border"
+              className={`flex flex-col items-center gap-2 rounded-lg p-3 border ${
+                isWildcard ? "bg-bungie-dark/40 border-gray-700/40" : "bg-bungie-dark border-bungie-border"
+              }`}
             >
               <span className="text-xs text-gray-400 uppercase tracking-wider">
                 {SLOT_LABELS[slotName]}
               </span>
               {slot && slot.item_hash === 0 ? (
                 <>
-                  <div className="w-14 h-14 rounded bg-purple-900/40 border border-purple-700/50 flex items-center justify-center text-2xl">
-                    ❓
+                  <div className="w-14 h-14 rounded bg-gray-800/50 border border-gray-700/50 flex items-center justify-center text-2xl opacity-50 grayscale">
+                    👤
                   </div>
-                  <div className="text-center">
-                    <p className="text-purple-300 text-xs font-semibold">Your Choice</p>
-                    <p className="text-gray-500 text-xs">Keep current weapon</p>
+                  <div className="text-center opacity-60">
+                    <p className="text-gray-400 text-xs font-semibold">Your Own</p>
+                    <p className="text-gray-500 text-xs">Skipped on apply</p>
                   </div>
                 </>
               ) : slot ? (

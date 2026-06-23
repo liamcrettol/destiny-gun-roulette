@@ -543,9 +543,9 @@ export default function LobbyRoom({
                         {locked ? "🔒" : "🔓"}
                       </button>
                       <button onClick={() => toggleWildcard(slot)}
-                        title={`Wildcard: everyone uses their own ${SLOT_LABELS[slot].toLowerCase()} weapon`}
+                        title={`Wildcard: everyone keeps their own ${SLOT_LABELS[slot].toLowerCase()} weapon (skipped on apply)`}
                         className={`px-2 py-1 rounded text-xs border transition ${wildcard ? "border-purple-500 bg-purple-500/20 text-purple-300" : "border-bungie-border text-gray-400 hover:border-gray-400"}`}>
-                        ❓
+                        👤
                       </button>
                       <span className="text-xs text-gray-500">{SLOT_LABELS[slot]}</span>
                     </span>

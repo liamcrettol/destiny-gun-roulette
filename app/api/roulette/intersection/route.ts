@@ -332,6 +332,31 @@ export async function POST(req: NextRequest) {
       if (equipped) equippedHashes[slot] = equipped.itemHash;
     }
 
+    // The round starts on the captain's currently-equipped loadout. Make sure
+    // those weapons have details to render even if they aren't in the shared
+    // pool (otherwise the seeded slot would come back empty).
+    const equippedHashList = Object.values(equippedHashes).filter(
+      (h): h is number => h !== null
+    );
+    const missingEquipped = equippedHashList.filter(
+      (h) => !weaponDetails[h.toString()]
+    );
+    if (missingEquipped.length > 0) {
+      const eqDefs = await getWeaponDefinitions(missingEquipped);
+      for (const [hash, def] of eqDefs) {
+        weaponDetails[hash.toString()] = {
+          name: def.name,
+          icon: def.icon,
+          weaponType: def.weaponType,
+          damageType: def.damageType,
+          tierType: def.tierType,
+          tierName: def.tierName,
+          ammoType: def.ammoType,
+          stats: def.stats,
+        };
+      }
+    }
+
     // ── Phase 8: Perk rolls from pre-fetched sockets (no extra API call) ─────
 
     const allIntersectionHashSet = new Set(allIntersectionHashes);
