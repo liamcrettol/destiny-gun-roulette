@@ -101,7 +101,8 @@ export async function POST(req: NextRequest) {
       session.bungieMembershipType,
       token,
       session.userId,
-      session.displayName
+      session.displayName,
+      myWeapons
     );
 
     const results = [...equipResults, ...missing];
