@@ -12,22 +12,13 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     const { lobbyId } = schema.parse(await req.json());
 
-    const { data: existingSession } = await adminSupabase
-      .from("game_sessions")
-      .select("id, player_game_stats(*)")
-      .eq("lobby_id", lobbyId)
-      .gte("played_at", new Date(Date.now() - 90 * 60 * 1000).toISOString())
-      .order("played_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingSession) {
-      return NextResponse.json({ done: true, stats: existingSession.player_game_stats });
-    }
-
+    // ── Step 1: Find the most recent apply time for this lobby ──────────────
+    // This anchors ALL session lookups to the current round. Without this,
+    // a game_session created for round N would incorrectly satisfy the "done"
+    // check for round N+1 (the old 90-min window bug).
     const { data: recentHistory } = await adminSupabase
       .from("roll_history")
-      .select("applied_at")
+      .select("applied_at, round_id")
       .eq("lobby_id", lobbyId)
       .not("applied_at", "is", null)
       .order("applied_at", { ascending: false })
@@ -36,6 +27,25 @@ export async function POST(req: NextRequest) {
 
     if (!recentHistory?.applied_at) return NextResponse.json({ done: false });
 
+    const appliedAt = recentHistory.applied_at as string;
+
+    // ── Step 2: Check if a session already exists for THIS round ───────────
+    // Only look for sessions created after the most recent apply — never
+    // return a session from a previous round.
+    const { data: existingSession } = await adminSupabase
+      .from("game_sessions")
+      .select("id, player_game_stats(*)")
+      .eq("lobby_id", lobbyId)
+      .gte("played_at", appliedAt)
+      .order("played_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSession) {
+      return NextResponse.json({ done: true, stats: existingSession.player_game_stats });
+    }
+
+    // ── Step 3: Load members ─────────────────────────────────────────────────
     const { data: members } = await adminSupabase
       .from("lobby_members")
       .select("user_id, display_name, bungie_membership_type, bungie_membership_id, selected_character_id")
@@ -55,15 +65,13 @@ export async function POST(req: NextRequest) {
 
     if (memberInputs.length < 2) return NextResponse.json({ done: false });
 
-    const { data: roundRows } = await adminSupabase
-      .from("lobby_rounds")
-      .select("id")
-      .eq("lobby_id", lobbyId);
-
+    // ── Step 4: Get CURRENT round's loadout slots only ────────────────────
+    // Using all historical rounds would build a hash set that could match
+    // a previous game's PGCR accidentally.
     const { data: slots } = await adminSupabase
       .from("lobby_loadout_slots")
       .select("item_hash")
-      .in("round_id", (roundRows ?? []).map((r) => r.id));
+      .eq("round_id", recentHistory.round_id);
 
     const rouletteHashes = [...new Set(
       (slots ?? []).map((s) => s.item_hash).filter((h) => h !== 0)
@@ -74,22 +82,25 @@ export async function POST(req: NextRequest) {
     const callerMember = members.find((m) => m.user_id === session.userId);
     if (!callerMember?.selected_character_id) return NextResponse.json({ done: false });
 
+    // ── Step 5: Hit Bungie PGCR ──────────────────────────────────────────────
     const token = await getBungieToken(session.userId);
     const result = await collectPostMatchStats(memberInputs, rouletteHashes, token);
     if (!result) return NextResponse.json({ done: false });
 
     const { playerStats, weaponKills } = result;
 
+    // ── Step 6: Race check (prevent duplicate saves from concurrent polls) ──
     const { data: raceCheck } = await adminSupabase
       .from("game_sessions")
       .select("id")
       .eq("lobby_id", lobbyId)
-      .gte("played_at", new Date(Date.now() - 90 * 60 * 1000).toISOString())
+      .gte("played_at", appliedAt)
       .limit(1)
       .maybeSingle();
 
     if (raceCheck) return NextResponse.json({ done: true, stats: playerStats });
 
+    // ── Step 7: Persist the game session ────────────────────────────────────
     const { data: gameSession } = await adminSupabase
       .from("game_sessions")
       .insert({ lobby_id: lobbyId, player_count: playerStats.length, roulette_hashes: rouletteHashes })

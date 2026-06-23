@@ -18,23 +18,44 @@ export async function POST(req: NextRequest) {
 
     if (!members?.length) return NextResponse.json({ ok: true, skipped: true });
 
-    // Get all roulette weapon hashes rolled in this lobby
-    const { data: roundRows } = await adminSupabase
-      .from("lobby_rounds")
-      .select("id")
-      .eq("lobby_id", lobbyId);
+    // Anchor to the most recent apply so duplicate calls can't create two sessions
+    const { data: recentHistory } = await adminSupabase
+      .from("roll_history")
+      .select("applied_at, round_id")
+      .eq("lobby_id", lobbyId)
+      .not("applied_at", "is", null)
+      .order("applied_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const roundIds = (roundRows ?? []).map((r) => r.id);
+    if (!recentHistory?.applied_at) return NextResponse.json({ ok: true, skipped: true, reason: "no apply found" });
+
+    const appliedAt = recentHistory.applied_at as string;
+
+    // Race check: don't create a duplicate session for this round
+    const { data: existing } = await adminSupabase
+      .from("game_sessions")
+      .select("id, player_game_stats(*)")
+      .eq("lobby_id", lobbyId)
+      .gte("played_at", appliedAt)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ ok: true, stats: existing.player_game_stats });
+    }
+
+    // Use current round's slots only (not all historical rounds)
     const { data: slots } = await adminSupabase
       .from("lobby_loadout_slots")
       .select("item_hash")
-      .in("round_id", roundIds);
+      .eq("round_id", recentHistory.round_id);
 
     const rouletteHashes = [...new Set(
       (slots ?? []).map((s) => s.item_hash).filter((h) => h !== 0)
     )];
 
-    if (!rouletteHashes.length) return NextResponse.json({ ok: true, skipped: true });
+    if (!rouletteHashes.length) return NextResponse.json({ ok: true, skipped: true, reason: "no weapons rolled" });
 
     const callerMember = members.find((m) => m.user_id === session.userId);
     if (!callerMember?.selected_character_id) {
@@ -59,6 +80,17 @@ export async function POST(req: NextRequest) {
     }
 
     const { playerStats, weaponKills } = result;
+
+    // Final race check right before insert
+    const { data: raceCheck } = await adminSupabase
+      .from("game_sessions")
+      .select("id")
+      .eq("lobby_id", lobbyId)
+      .gte("played_at", appliedAt)
+      .limit(1)
+      .maybeSingle();
+
+    if (raceCheck) return NextResponse.json({ ok: true, stats: playerStats });
 
     const { data: gameSession } = await adminSupabase
       .from("game_sessions")
