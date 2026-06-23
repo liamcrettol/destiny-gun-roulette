@@ -21,7 +21,7 @@ interface SocketsResponse {
   };
 }
 
-// Returns Map<instanceId, plugHashes[]> — the active perk plug hashes
+// Returns Map<instanceId, plugHashes[]> - the active perk plug hashes
 // for the main random-roll sockets (indices 3–5) of each requested instance.
 export async function getWeaponPerkHashes(
   membershipType: number,

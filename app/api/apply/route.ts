@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     const weaponsToApply: WeaponToApply[] = [];
     for (const slot of slots) {
-      if (slot.item_hash === 0) continue; // wildcard — player keeps their own weapon
+      if (slot.item_hash === 0) continue; // wildcard - player keeps their own weapon
       const best = findBestInstance(slot.item_hash, myWeapons, body.characterId, preferredInstances[slot.slot]);
       if (!best) continue;
       weaponsToApply.push({
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     // One roll_history row per round, updated on re-apply.
     // NOTE: roll_history has no unique constraint on round_id, so we can't use
-    // upsert/onConflict here — do an explicit select-then-update/insert instead.
+    // upsert/onConflict here - do an explicit select-then-update/insert instead.
     const appliedAt = new Date().toISOString();
     const { data: existingHistory } = await adminSupabase
       .from("roll_history")

@@ -19,7 +19,7 @@ export async function encryptToken(plaintext: string): Promise<string> {
     cipher.final(),
   ]);
   const tag = cipher.getAuthTag();
-  // Format: iv(12):tag(16):ciphertext — all base64
+  // Format: iv(12):tag(16):ciphertext - all base64
   return [iv.toString("base64"), tag.toString("base64"), encrypted.toString("base64")].join(":");
 }
 

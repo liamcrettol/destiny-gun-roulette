@@ -68,8 +68,8 @@ export async function getRawWeapons(
 
     for (const item of vaultWeaponItems) {
       const def = defs.get(item.itemHash);
-      if (!def) continue; // not a weapon — armor, material, etc.
-      // Use the definition's bucketTypeHash — the canonical slot for this weapon
+      if (!def) continue; // not a weapon - armor, material, etc.
+      // Use the definition's bucketTypeHash - the canonical slot for this weapon
       const slot = bucketToSlot(def.defaultBucketHash);
       if (!slot) continue;
       addWeapon(item, slot, "vault");

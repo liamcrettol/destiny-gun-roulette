@@ -87,7 +87,7 @@ export async function applyWeapons(
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Transfer failed";
       const friendly = raw.includes("1642") || raw.toLowerCase().includes("no room")
-        ? "Inventory full — clear a weapon slot on your character first"
+        ? "Inventory full. Clear a weapon slot on your character first"
         : raw;
       results.push({
         user_id: userId,

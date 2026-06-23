@@ -18,7 +18,7 @@ const schema = z.object({
 
 // Single combined fetch per member. Component 305 (ItemSockets) is the heaviest
 // part of the payload and is only needed for the caller (to show their perks), so
-// other members skip it. Component 300 (ItemInstances) is dropped entirely — the
+// other members skip it. Component 300 (ItemInstances) is dropped entirely - the
 // intersection only needs item hashes, not per-instance light levels.
 // 102 ProfileInventories · 200 Characters · 201 CharacterInventories ·
 // 205 CharacterEquipment · 305 ItemSockets (caller only) · 800 Collectibles

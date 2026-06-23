@@ -39,6 +39,8 @@ interface Props {
 }
 
 const CLASS_NAMES: Record<number, string> = { 0: "Titan", 1: "Hunter", 2: "Warlock" };
+// Display order for the character picker: Warlock, Hunter, Titan (left to right).
+const CLASS_ORDER = [2, 1, 0];
 const SLOT_LABELS: Record<WeaponSlot, string> = { kinetic: "Kinetic", energy: "Energy", power: "Power" };
 const POLL_INTERVAL_MS = 30_000;
 
@@ -164,7 +166,7 @@ export default function LobbyRoom({
         stopPolling();
         setLastGameStats(data.stats);
         fetchHistory();
-        // Reset local round state — server already advanced the round
+        // Reset local round state - server already advanced the round
         setSlots([]);
         setApplyResults([]);
         setLockedSlots(new Set());
@@ -289,7 +291,7 @@ export default function LobbyRoom({
     router.refresh();
   }, [lobby.id, router, stopPolling]);
 
-  // Picking a character is all a player needs to do — it persists their
+  // Picking a character is all a player needs to do - it persists their
   // selection so post-match stats can be collected. No separate "ready" step.
   const handleSelectCharacter = useCallback(async (characterId: string) => {
     setSelectedCharId(characterId);
@@ -474,7 +476,7 @@ export default function LobbyRoom({
           </div>
         </div>
 
-        {/* Last game results — prominent inline card, clears when captain rolls */}
+        {/* Last game results - prominent inline card, clears when captain rolls */}
         {lastGameStats && (
           <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
@@ -499,15 +501,17 @@ export default function LobbyRoom({
           </div>
         </div>
 
-        {/* Character picker — selecting your guardian is all a player needs to do */}
+        {/* Character picker - selecting your guardian is all a player needs to do */}
         {characters.length > 0 && (
           <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
             <h2 className="text-white font-semibold mb-1">Your Character</h2>
             <p className="text-xs text-gray-500 mb-3">
-              Pick your guardian — that&apos;s it. Your selection saves automatically so your stats get tracked.
+              Pick your guardian, that&apos;s it. Your selection saves automatically so your stats get tracked.
             </p>
             <div className="flex gap-3 flex-wrap">
-              {characters.map((c) => (
+              {[...characters]
+                .sort((a, b) => CLASS_ORDER.indexOf(a.classType) - CLASS_ORDER.indexOf(b.classType))
+                .map((c) => (
                 <button key={c.characterId} onClick={() => handleSelectCharacter(c.characterId)}
                   className={`px-4 py-2 rounded-lg border text-sm font-medium transition flex items-center gap-2 ${selectedCharId === c.characterId ? "border-bungie-blue bg-bungie-blue/20 text-white" : "border-bungie-border text-gray-400 hover:border-gray-500"}`}>
                   {selectedCharId === c.characterId && <span className="text-green-400">✓</span>}
@@ -558,7 +562,7 @@ export default function LobbyRoom({
                       <button
                         key={slot}
                         onClick={() => cycleSlotMode(slot)}
-                        title={`${SLOT_LABELS[slot]}: ${cfg.label} — click to cycle`}
+                        title={`${SLOT_LABELS[slot]}: ${cfg.label}, click to cycle`}
                         className={`px-2.5 py-1 rounded text-xs border transition flex items-center gap-1.5 ${cfg.cls}`}
                       >
                         <span>{cfg.icon}</span>
@@ -590,7 +594,7 @@ export default function LobbyRoom({
 
         {applyResults.length > 0 && <ApplyStatus results={applyResults} />}
 
-        {/* Round history — scrollable accordion of all past games */}
+        {/* Round history - scrollable accordion of all past games */}
         {roundHistory.length > 0 && (
           <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-bungie-border">

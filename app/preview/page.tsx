@@ -20,7 +20,7 @@ export default function PreviewPage() {
           <SeedButton />
         </div>
 
-        {/* Real leaderboard — reads from DB, reflects seeded data */}
+        {/* Real leaderboard - reads from DB, reflects seeded data */}
         <div>
           <p className="text-xs text-gray-600 uppercase tracking-widest mb-3">Global Leaderboard (live from DB)</p>
           <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading...</div>}>

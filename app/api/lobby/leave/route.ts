@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
           .update({ captain_user_id: newCaptain })
           .eq("id", lobbyId);
       } else {
-        // No one left — delete the lobby
+        // No one left - delete the lobby
         await adminSupabase.from("lobbies").delete().eq("id", lobbyId);
       }
     }

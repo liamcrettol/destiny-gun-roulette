@@ -1,6 +1,6 @@
 import { bungieGet } from "./client";
 
-// Collectible state bitmask — bit 0 = NotAcquired
+// Collectible state bitmask - bit 0 = NotAcquired
 const NOT_ACQUIRED = 1;
 
 interface CollectiblesResponse {

@@ -25,7 +25,7 @@ export async function getBungieToken(userId: string): Promise<string> {
     const expiresAt = new Date(data.expires_at).getTime();
     if (Date.now() > expiresAt - 90_000) {
       if (!data.refresh_token_enc) {
-        throw new Error("Bungie token expired — please sign in again");
+        throw new Error("Bungie token expired. Please sign in again");
       }
       const refreshToken = await decryptToken(data.refresh_token_enc);
       return refreshBungieToken(userId, refreshToken);
@@ -52,7 +52,7 @@ async function refreshBungieToken(userId: string, refreshToken: string): Promise
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Bungie token refresh failed (${res.status}): ${body.slice(0, 100)} — please sign out and sign in again`);
+    throw new Error(`Bungie token refresh failed (${res.status}): ${body.slice(0, 100)}. Please sign out and sign in again`);
   }
 
   const tokens = await res.json();

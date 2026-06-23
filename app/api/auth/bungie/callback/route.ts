@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     return errRedirect("token_fetch_threw", String(e));
   }
 
-  // Fetch Bungie memberships — GetMembershipsForCurrentUser returns both
+  // Fetch Bungie memberships - GetMembershipsForCurrentUser returns both
   // the Bungie.net user info AND linked Destiny platform accounts.
   // GetCurrentBungieNetUser does NOT include destinyMemberships.
   let userId: string;
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
     ? "__Secure-authjs.session-token"
     : "authjs.session-token";
 
-  // Build NextAuth JWT directly — bypasses credentials flow which has
+  // Build NextAuth JWT directly - bypasses credentials flow which has
   // issues in NextAuth v5 beta when called from server actions.
   let sessionToken: string;
   try {

@@ -47,7 +47,7 @@ export async function getManifest(): Promise<CachedManifest> {
   const paths = jsonWorldComponentContentPaths.en;
 
   if (meta?.version === version) {
-    // Version hasn't changed — load from DB cache
+    // Version hasn't changed - load from DB cache
     const { data: cached } = await adminSupabase
       .from("cached_manifest_metadata")
       .select("items_json, stats_json, damage_types_json, sandbox_perks_json")

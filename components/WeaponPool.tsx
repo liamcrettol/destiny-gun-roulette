@@ -242,7 +242,7 @@ function WeaponCard({
         </div>
       </button>
 
-      {/* Roll picker toggle — only shown when multiple rolls exist */}
+      {/* Roll picker toggle - only shown when multiple rolls exist */}
       {rolls.length > 1 && (
         <div className="border-t border-bungie-border/50">
           <button

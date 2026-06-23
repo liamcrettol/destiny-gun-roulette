@@ -4,7 +4,7 @@ import { adminSupabase } from "@/lib/supabase/admin";
 export async function GET() {
   const state = crypto.randomUUID();
 
-  // Store state in DB — cookies aren't reliable across serverless redirects
+  // Store state in DB - cookies aren't reliable across serverless redirects
   await adminSupabase.from("oauth_states").insert({
     state,
     expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
@@ -14,7 +14,7 @@ export async function GET() {
   authUrl.searchParams.set("client_id", process.env.BUNGIE_CLIENT_ID!);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
-  // Do NOT add scope — Bungie rejects any scope parameter
+  // Do NOT add scope - Bungie rejects any scope parameter
 
   return NextResponse.redirect(authUrl.toString());
 }

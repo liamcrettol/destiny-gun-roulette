@@ -1,6 +1,6 @@
 // Weapon + perk definitions served from a prebuilt static table.
 //
-// The full Bungie DestinyInventoryItemDefinition manifest is ~190 MB — far too
+// The full Bungie DestinyInventoryItemDefinition manifest is ~190 MB - far too
 // large to download and parse inside a serverless function (it times out / runs
 // out of memory, so an in-request build never completes). Instead we ship a
 // compact weapons-only table (~1.2 MB) and a perk-name map (~0.45 MB) generated
@@ -8,7 +8,7 @@
 // with zero network calls.
 //
 // To refresh after a Bungie manifest update, regenerate these JSON files from
-// the manifest (see scripts/build-weapons-table — or the one-off generator used
+// the manifest (see scripts/build-weapons-table - or the one-off generator used
 // to create them) and redeploy. Built from manifest version:
 //   244122.26.06.10.2000-1-bnet.65386
 
@@ -70,6 +70,6 @@ export async function getPerkName(hash: number): Promise<string | null> {
   return PERK_NAMES[hash.toString()] ?? null;
 }
 
-// No-op kept for call-site compatibility — definitions are now static, so there
+// No-op kept for call-site compatibility - definitions are now static, so there
 // is nothing to flush to a cache.
 export async function flushDefinitionCache(): Promise<void> {}

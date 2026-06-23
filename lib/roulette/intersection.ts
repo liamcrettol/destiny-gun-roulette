@@ -67,7 +67,7 @@ function pick(pool: number[]): number | null {
  * Roll a loadout from the shared pool, applying archetype pairing rules
  * between kinetic and energy slots.
  *
- * Rules (symmetric — applies whichever slot has the constrained type):
+ * Rules (symmetric - applies whichever slot has the constrained type):
  *   Pulse Rifle  → paired slot must be a Shotgun
  *   Hand Cannon  → paired slot must be a Shotgun or Sniper Rifle (random)
  */
