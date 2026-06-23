@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { collectPostMatchStats } from "@/lib/bungie/pgcr";
+import { rotateCaptain } from "@/lib/lobby";
 import { z } from "zod";
 
 const schema = z.object({ lobbyId: z.string().uuid() });
@@ -11,7 +12,6 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     const { lobbyId } = schema.parse(await req.json());
 
-    // Check if stats were already collected for a recent game in this lobby
     const { data: existingSession } = await adminSupabase
       .from("game_sessions")
       .select("id, player_game_stats(*)")
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ done: true, stats: existingSession.player_game_stats });
     }
 
-    // Get apply timestamp from roll_history so we don't match stale activities
     const { data: recentHistory } = await adminSupabase
       .from("roll_history")
       .select("applied_at")
@@ -37,7 +36,6 @@ export async function POST(req: NextRequest) {
 
     if (!recentHistory?.applied_at) return NextResponse.json({ done: false });
 
-    // Get all members with character IDs
     const { data: members } = await adminSupabase
       .from("lobby_members")
       .select("user_id, display_name, bungie_membership_type, bungie_membership_id, selected_character_id")
@@ -55,10 +53,8 @@ export async function POST(req: NextRequest) {
         characterId: m.selected_character_id!,
       }));
 
-    // Require at least 2 players to log stats
     if (memberInputs.length < 2) return NextResponse.json({ done: false });
 
-    // Get all roulette hashes for this lobby
     const { data: roundRows } = await adminSupabase
       .from("lobby_rounds")
       .select("id")
@@ -79,11 +75,9 @@ export async function POST(req: NextRequest) {
     if (!callerMember?.selected_character_id) return NextResponse.json({ done: false });
 
     const token = await getBungieToken(session.userId);
-
     const stats = await collectPostMatchStats(memberInputs, rouletteHashes, token);
     if (!stats) return NextResponse.json({ done: false });
 
-    // Race-safe insert: check again before writing
     const { data: raceCheck } = await adminSupabase
       .from("game_sessions")
       .select("id")
@@ -113,6 +107,8 @@ export async function POST(req: NextRequest) {
           roulette_weapon_kills: s.rouletteWeaponKills,
         }))
       );
+      // Auto-rotate captain the moment the game is confirmed over
+      await rotateCaptain(lobbyId);
     }
 
     return NextResponse.json({ done: true, stats });
