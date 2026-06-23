@@ -172,22 +172,22 @@ export default function LobbyRoom({
     recentRollsRef.current[slot] = [hash, ...hist.filter((h) => h !== hash)];
   }, []);
 
-  // Load saved roll prefs (mode, banned types, reroll limit) once on mount.
+  // Load saved roll prefs (banned types, reroll limit) once on mount. Mode is
+  // intentionally NOT persisted - it resets to Normal each time you enter a lobby.
   useEffect(() => {
     try {
       const raw = localStorage.getItem("gr_roll_prefs");
       if (!raw) return;
       const p = JSON.parse(raw);
-      if (["normal", "chaos", "meta"].includes(p.mode)) setRollMode(p.mode);
       if (Array.isArray(p.banned)) setBannedTypes(new Set(p.banned));
       if (p.rerollLimit === null || typeof p.rerollLimit === "number") setRerollLimit(p.rerollLimit);
     } catch { /* ignore */ }
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem("gr_roll_prefs", JSON.stringify({ mode: rollMode, banned: [...bannedTypes], rerollLimit }));
+      localStorage.setItem("gr_roll_prefs", JSON.stringify({ banned: [...bannedTypes], rerollLimit }));
     } catch { /* ignore */ }
-  }, [rollMode, bannedTypes, rerollLimit]);
+  }, [bannedTypes, rerollLimit]);
 
   // Reset the reroll budget at the start of each round.
   useEffect(() => { setRerollsUsed(0); }, [lobbyData.current_round]);
