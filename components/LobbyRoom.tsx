@@ -10,6 +10,7 @@ import LoadoutQueue from "./LoadoutQueue";
 import ApplyStatus from "./ApplyStatus";
 import SignOutButton from "./SignOutButton";
 import WeaponPool from "./WeaponPool";
+import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
 
 interface PlayerStat {
@@ -113,6 +114,10 @@ export default function LobbyRoom({
   const [instancePerks, setInstancePerks] = useState<Record<string, Array<{ instanceId: string; perks: string[]; location: string; characterId?: string }>>>({});
   const [collectionHashes, setCollectionHashes] = useState<Set<number>>(new Set());
   const [preferredInstances, setPreferredInstances] = useState<Partial<Record<WeaponSlot, string>>>({});
+  // Per-player roll data (everyone's instances of the current loadout) and the
+  // instance THIS player has chosen to equip for each slot.
+  const [rollsData, setRollsData] = useState<RollsData>({});
+  const [myChosenInstances, setMyChosenInstances] = useState<Partial<Record<WeaponSlot, string>>>({});
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
@@ -172,6 +177,48 @@ export default function LobbyRoom({
   useEffect(() => { setRerollsUsed(0); }, [lobbyData.current_round]);
 
   const rerollExhausted = rerollLimit !== null && rerollsUsed >= rerollLimit;
+
+  // Fetch every member's rolls (their instances + perk-adjusted stats) for the
+  // current loadout, so each player sees THEIR own roll and can compare/swap.
+  const slotKey = (["kinetic", "energy", "power"] as WeaponSlot[])
+    .map((s) => slots.find((x) => x.slot === s)?.item_hash ?? 0).join(",");
+  const fetchRolls = useCallback(async () => {
+    if (!roundId) return;
+    try {
+      const res = await fetch("/api/roulette/rolls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lobbyId: lobby.id, roundId }),
+      });
+      const data = await res.json();
+      const next: RollsData = data.slots ?? {};
+      setRollsData(next);
+      // Default each slot to my best instance (prefer one already on a character),
+      // keeping any still-valid existing choice.
+      setMyChosenInstances((prev) => {
+        const out: Partial<Record<WeaponSlot, string>> = {};
+        for (const s of ["kinetic", "energy", "power"] as WeaponSlot[]) {
+          const mine = next[s]?.members.find((m) => m.isMe)?.instances ?? [];
+          if (mine.length === 0) continue;
+          const keep = prev[s] && mine.some((i) => i.instanceId === prev[s]);
+          out[s] = keep ? prev[s] : (mine.find((i) => i.location === "character") ?? mine[0]).instanceId;
+        }
+        return out;
+      });
+    } catch {
+      // ignore - rolls panel just won't populate
+    }
+  }, [lobby.id, roundId]);
+
+  useEffect(() => {
+    if (roundId && slots.some((s) => s.item_hash !== 0)) fetchRolls();
+    else setRollsData({});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, slotKey]);
+
+  const handleChooseInstance = useCallback((slot: WeaponSlot, instanceId: string) => {
+    setMyChosenInstances((prev) => ({ ...prev, [slot]: instanceId }));
+  }, []);
 
   // Pool with banned weapon types removed - drives both the browser and rolls.
   const effectiveIntersection = useMemo(() => {
@@ -579,7 +626,9 @@ export default function LobbyRoom({
       const res = await fetch("/api/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lobbyId: lobby.id, roundId, characterId: selectedCharId, preferredInstances }),
+        // Each player equips their OWN chosen instance; fall back to the
+        // captain's per-slot pick from the browser for anything unset.
+        body: JSON.stringify({ lobbyId: lobby.id, roundId, characterId: selectedCharId, preferredInstances: { ...preferredInstances, ...myChosenInstances } }),
         signal: controller.signal,
       });
       const data = await res.json();
@@ -592,7 +641,7 @@ export default function LobbyRoom({
     }
     applyAbortRef.current = null;
     setLoadingAction(null);
-  }, [selectedCharId, roundId, lobby.id, preferredInstances, startPolling]);
+  }, [selectedCharId, roundId, lobby.id, preferredInstances, myChosenInstances, startPolling]);
 
   const handleCancelApply = useCallback(() => {
     applyAbortRef.current?.abort();
@@ -910,6 +959,10 @@ export default function LobbyRoom({
           <LoadoutQueue slots={slots} weaponDetails={weaponDetails} instancePerks={instancePerks}
             collectionHashes={collectionHashes} onApply={handleApply} animKindRef={animKindRef}
             onCancelApply={handleCancelApply} selectedCharId={selectedCharId} loading={loadingAction === "apply"} />
+        )}
+
+        {Object.keys(rollsData).length > 0 && (
+          <RollDetails rolls={rollsData} chosenInstances={myChosenInstances} onChooseInstance={handleChooseInstance} />
         )}
 
         {applyResults.length > 0 && <ApplyStatus results={applyResults} />}
