@@ -96,25 +96,27 @@ export async function GET(req: NextRequest) {
 
       if (!rouletteHashes.length) continue;
 
-      // Use the lobby host's token — they're the most stable reference
-      const { data: lobby } = await adminSupabase
-        .from("lobbies")
-        .select("host_user_id")
-        .eq("id", lobbyId)
-        .single();
+      // Pick a fireteam member whose token we can actually use as the activity-
+      // history source. It must be someone in memberInputs (so the token matches
+      // the membership we query). Try each until one's token refreshes cleanly.
+      let token: string | null = null;
+      let tokenOwnerUserId: string | null = null;
+      for (const m of memberInputs) {
+        try {
+          token = await getBungieToken(m.userId);
+          tokenOwnerUserId = m.userId;
+          break;
+        } catch {
+          // this member's token expired and can't refresh — try the next
+        }
+      }
 
-      if (!lobby) continue;
-
-      let token: string;
-      try {
-        token = await getBungieToken(lobby.host_user_id);
-      } catch {
-        // Host token expired and can't be refreshed — skip this lobby
-        errors.push(`${lobbyId}: host token unavailable`);
+      if (!token || !tokenOwnerUserId) {
+        errors.push(`${lobbyId}: no usable member token`);
         continue;
       }
 
-      const result = await collectPostMatchStats(memberInputs, rouletteHashes, token);
+      const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, tokenOwnerUserId);
       if (!result) continue;
 
       const { playerStats, weaponKills } = result;

@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     // ── Step 5: Hit Bungie PGCR ──────────────────────────────────────────────
     const token = await getBungieToken(session.userId);
-    const result = await collectPostMatchStats(memberInputs, rouletteHashes, token);
+    const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, session.userId);
     // PGCR not found yet — game is in progress or hasn't appeared on Bungie's servers
     if (!result) return NextResponse.json({ done: false, pending: true });
 

@@ -92,19 +92,24 @@ export interface PostMatchResult {
 export async function collectPostMatchStats(
   members: MemberStatInput[],
   rouletteHashes: number[],
-  hostAccessToken: string
+  accessToken: string,
+  // userId whose token `accessToken` is. Activity history must be queried for
+  // THIS member, otherwise the bearer token won't match the membership being
+  // requested and a private profile returns nothing (silently losing stats).
+  tokenOwnerUserId: string
 ): Promise<PostMatchResult | null> {
   if (!members.length || !rouletteHashes.length) return null;
 
-  const host = members[0];
+  // The activity-history source must be the member whose token we hold.
+  const source = members.find((m) => m.userId === tokenOwnerUserId) ?? members[0];
   const hashSet = new Set(rouletteHashes);
   const membershipIdSet = new Set(members.map((m) => m.membershipId));
 
   const activities = await getActivityHistory(
-    host.membershipType,
-    host.membershipId,
-    host.characterId,
-    hostAccessToken
+    source.membershipType,
+    source.membershipId,
+    source.characterId,
+    accessToken
   );
   if (!activities.length) return null;
 

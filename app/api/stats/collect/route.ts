@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         characterId: m.selected_character_id!,
       }));
 
-    const result = await collectPostMatchStats(memberInputs, rouletteHashes, hostToken);
+    const result = await collectPostMatchStats(memberInputs, rouletteHashes, hostToken, session.userId);
     if (!result) {
       return NextResponse.json({ ok: true, skipped: true, reason: "pgcr not found" });
     }
