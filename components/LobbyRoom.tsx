@@ -518,6 +518,17 @@ export default function LobbyRoom({
     const keep: Partial<Record<WeaponSlot, number>> = {};
     for (const s of slots) { if (s.item_hash !== 0) keep[s.slot as WeaponSlot] = s.item_hash; }
     keep[slot] = hash;
+    // Destiny allows only one exotic equipped. If the captain picks an exotic,
+    // release any OTHER slot that's currently exotic so it re-rolls non-exotic.
+    const isExotic = (h?: number) => h !== undefined && (weaponDetails[h.toString()]?.tierType ?? 5) === 6;
+    if (isExotic(hash)) {
+      for (const s of Object.keys(keep) as WeaponSlot[]) {
+        if (s !== slot && isExotic(keep[s])) {
+          delete keep[s];
+          setPreferredInstances((prev) => { const n = { ...prev }; delete n[s]; return n; });
+        }
+      }
+    }
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

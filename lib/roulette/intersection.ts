@@ -90,22 +90,39 @@ export function rollLoadout(
   let kineticHash: number | null = keep.kinetic ?? null;
   let energyHash: number | null = keep.energy ?? null;
 
+  // Destiny only allows ONE exotic weapon equipped across all slots.
+  const isExotic = (h: number | null | undefined) =>
+    h != null && (weaponDetails[h.toString()]?.tierType ?? 5) === 6;
+  // An exotic the player explicitly locked/selected (in any slot, incl. power)
+  // claims the single exotic slot — every rolled slot must then stay non-exotic.
+  const keptExotic = isExotic(keep.kinetic) || isExotic(keep.energy) || isExotic(keep.power);
+
+  // Drop exotics from a pool when an exotic is already committed elsewhere.
+  // Falls back to the full pool if that would empty it (don't leave a slot blank).
+  const dropExoticsIf = (pool: number[], shouldDrop: boolean): number[] => {
+    if (!shouldDrop) return pool;
+    const nonExotic = pool.filter((h) => !isExotic(h));
+    return nonExotic.length > 0 ? nonExotic : pool;
+  };
+
   // Roll kinetic first (if not locked)
   if (!kineticKept) {
     // If energy is already locked, let its type constrain the kinetic pool
     const energyType = energyHash !== null ? weaponDetails[energyHash.toString()]?.weaponType : null;
-    const kPool = energyType
+    let kPool = energyType
       ? applyPairingRule(intersection.kinetic, energyType, weaponDetails)
       : intersection.kinetic;
+    kPool = dropExoticsIf(kPool, keptExotic || isExotic(energyHash));
     kineticHash = pick(kPool);
   }
 
   // Roll energy (if not locked), constrained by whatever kinetic ended up as
   if (!energyKept) {
     const kineticType = kineticHash !== null ? weaponDetails[kineticHash.toString()]?.weaponType : null;
-    const ePool = kineticType
+    let ePool = kineticType
       ? applyPairingRule(intersection.energy, kineticType, weaponDetails)
       : intersection.energy;
+    ePool = dropExoticsIf(ePool, keptExotic || isExotic(kineticHash));
     energyHash = pick(ePool);
   }
 
