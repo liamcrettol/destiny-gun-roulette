@@ -107,8 +107,31 @@ export async function POST(req: NextRequest) {
           roulette_weapon_kills: s.rouletteWeaponKills,
         }))
       );
-      // Auto-rotate captain the moment the game is confirmed over
+
       await rotateCaptain(lobbyId);
+
+      const { data: lobby } = await adminSupabase
+        .from("lobbies")
+        .select("current_round")
+        .eq("id", lobbyId)
+        .single();
+
+      if (lobby) {
+        const nextRound = lobby.current_round + 1;
+        await adminSupabase.from("lobby_rounds").insert({
+          lobby_id: lobbyId,
+          round_number: nextRound,
+          status: "pending",
+        });
+        await adminSupabase
+          .from("lobby_members")
+          .update({ is_ready: false })
+          .eq("lobby_id", lobbyId);
+        await adminSupabase
+          .from("lobbies")
+          .update({ current_round: nextRound, status: "waiting" })
+          .eq("id", lobbyId);
+      }
     }
 
     return NextResponse.json({ done: true, stats });
