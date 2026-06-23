@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    if (!recentHistory?.applied_at) return NextResponse.json({ done: false });
+    // No apply has happened for this lobby yet — nothing to detect
+    if (!recentHistory?.applied_at) return NextResponse.json({ done: false, pending: false });
 
     const appliedAt = recentHistory.applied_at as string;
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
         characterId: m.selected_character_id!,
       }));
 
-    if (memberInputs.length < 2) return NextResponse.json({ done: false });
+    if (memberInputs.length < 2) return NextResponse.json({ done: false, pending: true });
 
     // ── Step 4: Get CURRENT round's loadout slots only ────────────────────
     // Using all historical rounds would build a hash set that could match
@@ -77,15 +78,16 @@ export async function POST(req: NextRequest) {
       (slots ?? []).map((s) => s.item_hash).filter((h) => h !== 0)
     )];
 
-    if (!rouletteHashes.length) return NextResponse.json({ done: false });
+    if (!rouletteHashes.length) return NextResponse.json({ done: false, pending: true });
 
     const callerMember = members.find((m) => m.user_id === session.userId);
-    if (!callerMember?.selected_character_id) return NextResponse.json({ done: false });
+    if (!callerMember?.selected_character_id) return NextResponse.json({ done: false, pending: true });
 
     // ── Step 5: Hit Bungie PGCR ──────────────────────────────────────────────
     const token = await getBungieToken(session.userId);
     const result = await collectPostMatchStats(memberInputs, rouletteHashes, token);
-    if (!result) return NextResponse.json({ done: false });
+    // PGCR not found yet — game is in progress or hasn't appeared on Bungie's servers
+    if (!result) return NextResponse.json({ done: false, pending: true });
 
     const { playerStats, weaponKills } = result;
 

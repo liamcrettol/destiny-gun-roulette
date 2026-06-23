@@ -214,8 +214,11 @@ export default function LobbyRoom({
         setPreferredInstances({});
         hasAutoLoaded.current = false;
       }
+      // If a game is pending but not yet found, return whether we should poll
+      return data.pending ?? false;
     } catch {
       // ignore poll errors
+      return false;
     }
   }, [lobby.id, stopPolling, fetchHistory]);
 
@@ -227,6 +230,15 @@ export default function LobbyRoom({
   }, [detectGameEnd]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // On mount: check if a game was in progress when everyone left the lobby.
+  // If detect says pending=true, start polling so we catch up automatically.
+  useEffect(() => {
+    detectGameEnd().then((pending) => {
+      if (pending) startPolling();
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const channel = supabase
