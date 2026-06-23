@@ -48,6 +48,14 @@ const POLL_INTERVAL_MS = 30_000;
 // How many recent weapons per slot to avoid repeating on a roll.
 const ROLL_HISTORY_SIZE = 4;
 
+const LOBBY_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  waiting: { label: "Waiting", cls: "border-bungie-border text-gray-400" },
+  rolling: { label: "Rolling", cls: "border-bungie-blue/50 bg-bungie-blue/10 text-bungie-blue" },
+  applying: { label: "Applying", cls: "border-bungie-blue/50 bg-bungie-blue/10 text-bungie-blue" },
+  in_game: { label: "● In game", cls: "border-green-600/50 bg-green-900/20 text-green-400" },
+  done: { label: "Ended", cls: "border-gray-700 text-gray-500" },
+};
+
 // Per-slot mode cycle: Random → Locked → Your own.
 type SlotMode = "normal" | "lock" | "wildcard";
 const SLOT_MODE_CONFIG: Record<SlotMode, { icon: string; label: string; cls: string }> = {
@@ -785,6 +793,10 @@ export default function LobbyRoom({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {(() => {
+              const cfg = LOBBY_STATUS_BADGE[lobbyData.status] ?? LOBBY_STATUS_BADGE.waiting;
+              return <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.cls}`}>{cfg.label}</span>;
+            })()}
             <span className="text-sm text-gray-400">Round {lobbyData.current_round}</span>
             {polling && (
               <span className="text-xs text-green-500 animate-pulse">● watching</span>

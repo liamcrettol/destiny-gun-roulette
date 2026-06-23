@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
           .eq("lobby_id", lobbyId);
         await adminSupabase
           .from("lobbies")
-          .update({ current_round: nextRound, status: "waiting" })
+          .update({ current_round: nextRound, status: "waiting", last_active_at: new Date().toISOString() })
           .eq("id", lobbyId);
       }
     }

@@ -132,6 +132,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Loadout applied - the fireteam is heading into a game.
+    await adminSupabase
+      .from("lobbies")
+      .update({ status: "in_game", last_active_at: appliedAt })
+      .eq("id", body.lobbyId);
+
     return NextResponse.json({ results });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

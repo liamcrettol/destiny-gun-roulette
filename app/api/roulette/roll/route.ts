@@ -119,6 +119,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // A loadout is on the board now - lobby is actively rolling.
+    await adminSupabase
+      .from("lobbies")
+      .update({ status: "rolling", last_active_at: new Date().toISOString() })
+      .eq("id", body.lobbyId);
+
     return NextResponse.json({ roll });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
