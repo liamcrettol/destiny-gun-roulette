@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { LobbyLoadoutSlot } from "@/types/lobby";
 import { type WeaponDetail, type InstancePerk, useWeaponTooltip } from "./weaponShared";
+import { playTick, playReveal } from "./rollSound";
 
 const SLOT_LABELS: Record<string, string> = {
   kinetic: "Kinetic",
@@ -22,6 +24,54 @@ interface Props {
 }
 
 const SLOT_ORDER = ["kinetic", "energy", "power"];
+const SPIN_STEP_MS = 60;
+const SPIN_TOTAL_MS = 700;
+
+// Slot-machine icon: when the weapon hash changes, flicker through random
+// pooled icons for a beat, then snap to the final and play a reveal sound.
+function SlotIcon({
+  hash, icon, watermark, alt, iconPool, exotic,
+}: {
+  hash: number; icon: string; watermark?: string; alt: string; iconPool: string[]; exotic: boolean;
+}) {
+  const [displayIcon, setDisplayIcon] = useState(icon);
+  const [spinning, setSpinning] = useState(false);
+  const firstRender = useRef(true);
+  const prevHash = useRef(hash);
+
+  useEffect(() => {
+    // Don't animate the initial mount or non-changes (e.g. weaponDetails loading)
+    if (firstRender.current) { firstRender.current = false; prevHash.current = hash; setDisplayIcon(icon); return; }
+    if (hash === prevHash.current) { setDisplayIcon(icon); return; }
+    prevHash.current = hash;
+
+    if (iconPool.length < 2) { setDisplayIcon(icon); playReveal(exotic); return; }
+
+    setSpinning(true);
+    let elapsed = 0;
+    const id = setInterval(() => {
+      elapsed += SPIN_STEP_MS;
+      setDisplayIcon(iconPool[Math.floor(Math.random() * iconPool.length)]);
+      playTick();
+      if (elapsed >= SPIN_TOTAL_MS) {
+        clearInterval(id);
+        setDisplayIcon(icon);
+        setSpinning(false);
+        playReveal(exotic);
+      }
+    }, SPIN_STEP_MS);
+    return () => clearInterval(id);
+  }, [hash, icon, exotic, iconPool]);
+
+  return (
+    <div className={`relative w-14 h-14 transition-transform duration-150 ${spinning ? "blur-[1px] scale-110" : "scale-100"}`}>
+      <Image src={displayIcon} alt={alt} fill className="object-cover rounded" unoptimized />
+      {!spinning && watermark && (
+        <Image src={watermark} alt="" fill className="object-cover rounded pointer-events-none" unoptimized />
+      )}
+    </div>
+  );
+}
 
 export default function LoadoutQueue({
   slots, weaponDetails, instancePerks = {}, collectionHashes = new Set(),
@@ -29,6 +79,21 @@ export default function LoadoutQueue({
 }: Props) {
   const sorted = SLOT_ORDER.map((s) => slots.find((x) => x.slot === s)).filter(Boolean) as LobbyLoadoutSlot[];
   const { onHover, onLeave, node: tooltipNode } = useWeaponTooltip(weaponDetails, instancePerks, collectionHashes);
+
+  // A capped, deduped pool of weapon icons to flicker through during the spin.
+  const iconPool = useMemo(() => {
+    const icons = new Set<string>();
+    for (const d of Object.values(weaponDetails)) {
+      if (d.icon) icons.add(d.icon);
+      if (icons.size >= 40) break;
+    }
+    return [...icons];
+  }, [weaponDetails]);
+
+  // Preload the spin icons so the flicker doesn't stutter on first cycle.
+  useEffect(() => {
+    for (const ic of iconPool) { const img = new window.Image(); img.src = ic; }
+  }, [iconPool]);
 
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
@@ -67,24 +132,14 @@ export default function LoadoutQueue({
                 </>
               ) : slot ? (
                 <>
-                  <div className="relative w-14 h-14">
-                    <Image
-                      src={slot.weapon_icon}
-                      alt={slot.weapon_name}
-                      fill
-                      className="object-cover rounded"
-                      unoptimized
-                    />
-                    {weaponDetails[slot.item_hash]?.watermark && (
-                      <Image
-                        src={weaponDetails[slot.item_hash].watermark!}
-                        alt=""
-                        fill
-                        className="object-cover rounded pointer-events-none"
-                        unoptimized
-                      />
-                    )}
-                  </div>
+                  <SlotIcon
+                    hash={slot.item_hash}
+                    icon={slot.weapon_icon}
+                    watermark={weaponDetails[slot.item_hash]?.watermark}
+                    alt={slot.weapon_name}
+                    iconPool={iconPool}
+                    exotic={weaponDetails[slot.item_hash]?.tierType === 6}
+                  />
                   <div className="text-center">
                     <p className="text-white text-xs font-semibold leading-tight">
                       {slot.weapon_name}
