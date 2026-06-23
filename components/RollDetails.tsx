@@ -4,10 +4,11 @@ import { useState } from "react";
 import type { WeaponSlot } from "@/types/bungie";
 import { BAR_STATS, NUM_STATS, damageTheme } from "./weaponShared";
 
+export interface Perk { name: string; description: string }
 export interface RollInstance {
   instanceId: string;
   location: "character" | "vault";
-  perks: string[];
+  perks: Perk[];
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -166,7 +167,13 @@ export default function RollDetails({
               <div key={`p-${m.userId}`} className="text-center px-0.5">
                 {inst ? (
                   <p className={`text-[10px] leading-tight ${m.isMe ? theme.text : "text-gray-400"}`}>
-                    {inst.perks.length ? inst.perks.join(" · ") : "—"}
+                    {inst.perks.length
+                      ? inst.perks.map((p, i) => (
+                          <span key={p.name} title={p.description || undefined} className={p.description ? "cursor-help" : undefined}>
+                            {p.name}{i < inst.perks.length - 1 ? " · " : ""}
+                          </span>
+                        ))
+                      : "—"}
                   </p>
                 ) : (
                   <p className="text-[10px] text-gray-600">doesn&apos;t own</p>
@@ -208,11 +215,10 @@ export default function RollDetails({
                         )}
                       </div>
                       <span className={`w-5 text-right tabular-nums text-[11px] ${isBest ? `${theme.text} font-semibold` : "text-gray-300"}`}>{v}</span>
-                      {m.isMe && delta !== 0 && (
-                        <span className={`w-6 text-right text-[9px] tabular-nums ${delta > 0 ? "text-green-400" : "text-red-400"}`}>
-                          {delta > 0 ? `+${delta}` : delta}
-                        </span>
-                      )}
+                      {/* Always reserve the delta column so every bar lines up */}
+                      <span className={`w-6 text-right text-[9px] tabular-nums ${delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : "text-transparent"}`}>
+                        {m.isMe && delta !== 0 ? (delta > 0 ? `+${delta}` : delta) : ""}
+                      </span>
                     </div>
                   );
                 })}

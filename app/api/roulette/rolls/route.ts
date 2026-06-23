@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { bungieGet } from "@/lib/bungie/client";
-import { getPerkNames, getWeaponDefinitions } from "@/lib/bungie/definitions";
+import { getPerkInfos, getWeaponDefinitions } from "@/lib/bungie/definitions";
 import { z } from "zod";
 import type { WeaponSlot } from "@/types/bungie";
 
@@ -36,11 +36,12 @@ const STAT_NAMES: Record<number, string> = {
   2762071195: "Guard Efficiency",
 };
 
+interface Perk { name: string; description: string }
 interface RollInstance {
   instanceId: string;
   location: "character" | "vault";
   perkHashes: number[];
-  perks: string[];
+  perks: Perk[];
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -150,12 +151,13 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // Resolve all perk plug hashes to names in one pass; base stats per weapon.
-    const [perkNameMap, defs] = await Promise.all([
-      getPerkNames([...allPerkHashes]),
+    // Resolve all perk plug hashes to { name, description } in one pass; base
+    // stats per weapon. Cosmetic plugs (shaders/ornaments) aren't in the perk
+    // map, so they're dropped here.
+    const [perkInfoMap, defs] = await Promise.all([
+      getPerkInfos([...allPerkHashes]),
       getWeaponDefinitions([...loadoutHashes]),
     ]);
-    const nameOf = (h: number) => perkNameMap.get(h) ?? "Unknown";
 
     // Build the response: per slot -> { itemHash, damageType, baseStats, members: [...] }
     const slots: Record<string, { itemHash: number; damageType: string; baseStats: Record<string, number>; members: MemberRolls[] }> = {};
@@ -165,7 +167,10 @@ export async function POST(req: NextRequest) {
         if (!m) continue;
         const instances = (m.byHash.get(hash) ?? []).map((inst) => ({
           ...inst,
-          perks: inst.perkHashes.map(nameOf),
+          // Resolve to {name, description}, dropping any cosmetic plugs.
+          perks: inst.perkHashes
+            .map((h) => perkInfoMap.get(h))
+            .filter((p): p is Perk => !!p),
         }));
         memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances });
       }

@@ -15,6 +15,7 @@
 
 import weaponsRaw from "./data/weapons-table.json";
 import perkNamesRaw from "./data/perk-names.json";
+import perkDataRaw from "./data/perk-data.json";
 
 export interface WeaponDefinition {
   itemHash: number;
@@ -41,6 +42,19 @@ const WEAPONS: Map<number, WeaponDefinition> = (() => {
 })();
 
 const PERK_NAMES = perkNamesRaw as unknown as Record<string, string>;
+const PERK_DATA = perkDataRaw as unknown as Record<string, { n: string; d: string }>;
+
+export interface PerkInfo { name: string; description: string }
+
+/** Resolve perk hashes to { name, description }. Unknown/cosmetic hashes are omitted. */
+export async function getPerkInfos(hashes: number[]): Promise<Map<number, PerkInfo>> {
+  const result = new Map<number, PerkInfo>();
+  for (const hash of hashes) {
+    const d = PERK_DATA[hash.toString()];
+    if (d) result.set(hash, { name: d.n, description: d.d });
+  }
+  return result;
+}
 
 export async function getWeaponDefinitions(
   hashes: number[]

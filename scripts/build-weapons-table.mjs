@@ -66,8 +66,13 @@ async function main() {
   if (!itemsRes.ok) throw new Error(`Item table download ${itemsRes.status}`);
   const all = await itemsRes.json();
 
+  // Plug categories that are cosmetic / non-perk and should never show up as a
+  // weapon "perk" (shaders, ornaments, masterworks, mods, trackers, etc.).
+  const COSMETIC_PLUG = /shader|ornament|skins|masterwork|tracker|memento|\bmod|projection|ghost|empty|catalyst/i;
+
   const weapons = {};
   const perkNames = {};
+  const perkData = {};
   for (const key in all) {
     const def = all[key];
 
@@ -97,18 +102,27 @@ async function main() {
       };
     }
 
-    // Socket plugs (weapon perks live here) -> name lookup
+    // Socket plugs (weapon perks live here) -> name + description lookup.
+    // Skip cosmetic plugs (shaders/ornaments/mods/etc.) so they never render
+    // as weapon perks.
     if (def.plug && def.displayProperties?.name) {
+      const pcid = def.plug.plugCategoryIdentifier || "";
+      if (COSMETIC_PLUG.test(pcid)) continue;
       perkNames[key] = def.displayProperties.name;
+      perkData[key] = {
+        n: def.displayProperties.name,
+        d: def.displayProperties.description || "",
+      };
     }
   }
 
   writeFileSync(`${DATA_DIR}/weapons-table.json`, JSON.stringify(weapons));
   writeFileSync(`${DATA_DIR}/perk-names.json`, JSON.stringify(perkNames));
+  writeFileSync(`${DATA_DIR}/perk-data.json`, JSON.stringify(perkData));
   writeFileSync(versionFile, version + "\n");
 
   console.log(
-    `Wrote ${Object.keys(weapons).length} weapons, ${Object.keys(perkNames).length} perks (manifest ${version}).`
+    `Wrote ${Object.keys(weapons).length} weapons, ${Object.keys(perkData).length} perks (manifest ${version}).`
   );
 }
 
