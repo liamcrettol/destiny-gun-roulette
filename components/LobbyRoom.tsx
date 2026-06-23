@@ -10,8 +10,17 @@ import LoadoutQueue from "./LoadoutQueue";
 import ApplyStatus from "./ApplyStatus";
 import SignOutButton from "./SignOutButton";
 import WeaponPool from "./WeaponPool";
-import PostMatchSummary from "./PostMatchSummary";
 import type { ApplyResult } from "@/types/lobby";
+
+interface PlayerStat {
+  userId: string;
+  displayName: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kd: number;
+  rouletteWeaponKills: number;
+}
 
 interface Props {
   lobby: Lobby;
@@ -24,6 +33,7 @@ interface Props {
 
 const CLASS_NAMES: Record<number, string> = { 0: "Titan", 1: "Hunter", 2: "Warlock" };
 const SLOT_LABELS: Record<WeaponSlot, string> = { kinetic: "Kinetic", energy: "Energy", power: "Power" };
+const POLL_INTERVAL_MS = 30_000;
 
 export default function LobbyRoom({
   lobby,
@@ -54,13 +64,100 @@ export default function LobbyRoom({
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
   const [lockedSlots, setLockedSlots] = useState<Set<WeaponSlot>>(new Set());
   const [wildcardSlots, setWildcardSlots] = useState<Set<WeaponSlot>>(new Set());
-  const [showPostMatch, setShowPostMatch] = useState(false);
+  // Post-match state
+  const [postMatchStats, setPostMatchStats] = useState<PlayerStat[] | null>(null);
+  const [polling, setPolling] = useState(false);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const applyAbortRef = useRef<AbortController | null>(null);
   const roundIdRef = useRef<string | null>(null);
   useEffect(() => { roundIdRef.current = roundId; }, [roundId]);
   const hasAutoLoaded = useRef(false);
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
+
+  // --- Polling logic ---
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    setPolling(false);
+  }, []);
+
+  const detectGameEnd = useCallback(async () => {
+    try {
+      const res = await fetch("/api/stats/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lobbyId: lobby.id }),
+      });
+      const data = await res.json();
+      if (data.done && data.stats) {
+        stopPolling();
+        setPostMatchStats(data.stats);
+      }
+    } catch {
+      // silently ignore poll errors
+    }
+  }, [lobby.id, stopPolling]);
+
+  const startPolling = useCallback(() => {
+    if (pollTimerRef.current) return;
+    setPolling(true);
+    // Run immediately, then on interval
+    detectGameEnd();
+    pollTimerRef.current = setInterval(detectGameEnd, POLL_INTERVAL_MS);
+  }, [detectGameEnd]);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // If another client already found the game, pick it up via realtime on game_sessions
+  useEffect(() => {
+    const channel = supabase
+      .channel(`lobby:${lobby.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobby.id}` },
+        (payload) => setLobbyData(payload.new as Lobby)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobby.id}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setMembers((prev) => [...prev.filter((m) => m.id !== (payload.new as LobbyMember).id), payload.new as LobbyMember]);
+          } else if (payload.eventType === "UPDATE") {
+            setMembers((prev) => prev.map((m) => m.id === (payload.new as LobbyMember).id ? payload.new as LobbyMember : m));
+          } else if (payload.eventType === "DELETE") {
+            setMembers((prev) => prev.filter((m) => m.id !== (payload.old as LobbyMember).id));
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "game_sessions", filter: `lobby_id=eq.${lobby.id}` },
+        () => {
+          // Another client found the game — fetch stats if we don't have them yet
+          if (!postMatchStats) detectGameEnd();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lobby_loadout_slots" },
+        (payload) => {
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            const s = payload.new as LobbyLoadoutSlot;
+            if (roundIdRef.current && s.round_id !== roundIdRef.current) return;
+            setSlots((prev) => [...prev.filter((x) => x.slot !== s.slot), s]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobby.id, supabase]);
 
   useEffect(() => {
     fetch("/api/bungie/characters")
@@ -107,47 +204,8 @@ export default function LobbyRoom({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lobby.id, lobbyData.current_round]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(`lobby:${lobby.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobby.id}` },
-        (payload) => {
-          setLobbyData(payload.new as Lobby);
-          if ((payload.new as Lobby).status === "done") setShowPostMatch(true);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobby.id}` },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setMembers((prev) => [...prev.filter((m) => m.id !== (payload.new as LobbyMember).id), payload.new as LobbyMember]);
-          } else if (payload.eventType === "UPDATE") {
-            setMembers((prev) => prev.map((m) => m.id === (payload.new as LobbyMember).id ? payload.new as LobbyMember : m));
-          } else if (payload.eventType === "DELETE") {
-            setMembers((prev) => prev.filter((m) => m.id !== (payload.old as LobbyMember).id));
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "lobby_loadout_slots" },
-        (payload) => {
-          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            const s = payload.new as LobbyLoadoutSlot;
-            if (roundIdRef.current && s.round_id !== roundIdRef.current) return;
-            setSlots((prev) => [...prev.filter((x) => x.slot !== s.slot), s]);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [lobby.id, supabase]);
-
   const handleLeave = useCallback(async () => {
+    stopPolling();
     await fetch("/api/lobby/leave", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -155,7 +213,7 @@ export default function LobbyRoom({
     });
     router.push("/dashboard");
     router.refresh();
-  }, [lobby.id, router]);
+  }, [lobby.id, router, stopPolling]);
 
   const handleReady = useCallback(async () => {
     if (!selectedCharId) return;
@@ -184,12 +242,10 @@ export default function LobbyRoom({
         setLoadingAction(null);
         return;
       }
-
       setIntersection(data.intersection);
       setWeaponDetails(data.weaponDetails ?? {});
       setInstancePerks(data.instancePerks ?? {});
       setCollectionHashes(new Set<number>(data.collectionHashes ?? []));
-
       if (isCaptain && roundId) {
         const equipped: Record<string, number> = {};
         const eq = data.equippedHashes as Record<string, number | null>;
@@ -200,9 +256,7 @@ export default function LobbyRoom({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            lobbyId: lobby.id,
-            roundId,
-            intersection: data.intersection,
+            lobbyId: lobby.id, roundId, intersection: data.intersection,
             weaponDetails: data.weaponDetails ?? {},
             keepSlots: Object.keys(equipped).length > 0 ? equipped : undefined,
           }),
@@ -215,38 +269,24 @@ export default function LobbyRoom({
   }, [lobby.id, isCaptain, slots.length, roundId]);
 
   const toggleLock = useCallback((slot: WeaponSlot) => {
-    setLockedSlots((prev) => {
-      const next = new Set(prev);
-      if (next.has(slot)) next.delete(slot);
-      else next.add(slot);
-      return next;
-    });
+    setLockedSlots((prev) => { const n = new Set(prev); n.has(slot) ? n.delete(slot) : n.add(slot); return n; });
     setWildcardSlots((prev) => { const n = new Set(prev); n.delete(slot); return n; });
   }, []);
 
   const toggleWildcard = useCallback((slot: WeaponSlot) => {
-    setWildcardSlots((prev) => {
-      const next = new Set(prev);
-      if (next.has(slot)) next.delete(slot);
-      else next.add(slot);
-      return next;
-    });
+    setWildcardSlots((prev) => { const n = new Set(prev); n.has(slot) ? n.delete(slot) : n.add(slot); return n; });
     setLockedSlots((prev) => { const n = new Set(prev); n.delete(slot); return n; });
   }, []);
 
   const handleRoll = useCallback(async (rerollSlot?: WeaponSlot) => {
     if (!intersection || !roundId) return;
     setLoadingAction("roll");
-
-    let keepSlots: Record<string, number> | undefined;
     const effectiveWildcards = new Set(wildcardSlots);
     if (rerollSlot) effectiveWildcards.delete(rerollSlot);
-
+    let keepSlots: Record<string, number> | undefined;
     if (rerollSlot) {
       keepSlots = Object.fromEntries(
-        slots
-          .filter((s) => s.slot !== rerollSlot && !effectiveWildcards.has(s.slot as WeaponSlot))
-          .map((s) => [s.slot, s.item_hash])
+        slots.filter((s) => s.slot !== rerollSlot && !effectiveWildcards.has(s.slot as WeaponSlot)).map((s) => [s.slot, s.item_hash])
       );
     } else {
       const kept = slots.filter((s) => {
@@ -254,23 +294,12 @@ export default function LobbyRoom({
         if (s.slot === "power") return true;
         return lockedSlots.has(s.slot as WeaponSlot);
       });
-      if (kept.length > 0) {
-        keepSlots = Object.fromEntries(kept.map((s) => [s.slot, s.item_hash]));
-      }
+      if (kept.length > 0) keepSlots = Object.fromEntries(kept.map((s) => [s.slot, s.item_hash]));
     }
-
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lobbyId: lobby.id,
-        roundId,
-        intersection,
-        weaponDetails,
-        rerollSlot,
-        keepSlots,
-        wildcardSlots: Array.from(effectiveWildcards),
-      }),
+      body: JSON.stringify({ lobbyId: lobby.id, roundId, intersection, weaponDetails, rerollSlot, keepSlots, wildcardSlots: Array.from(effectiveWildcards) }),
     });
     setLoadingAction(null);
   }, [intersection, roundId, lobby.id, slots, weaponDetails, lockedSlots]);
@@ -288,13 +317,17 @@ export default function LobbyRoom({
         signal: controller.signal,
       });
       const data = await res.json();
-      if (data.results) setApplyResults(data.results);
+      if (data.results) {
+        setApplyResults(data.results);
+        // Loadout applied — start watching for the game to end
+        startPolling();
+      }
     } catch (e) {
       if ((e as Error).name !== "AbortError") console.error("Apply failed:", e);
     }
     applyAbortRef.current = null;
     setLoadingAction(null);
-  }, [selectedCharId, roundId, lobby.id]);
+  }, [selectedCharId, roundId, lobby.id, preferredInstances, startPolling]);
 
   const handleCancelApply = useCallback(() => {
     applyAbortRef.current?.abort();
@@ -305,19 +338,14 @@ export default function LobbyRoom({
   const handleSelectWeapon = useCallback(async (slot: WeaponSlot, hash: number, instanceId?: string) => {
     if (!intersection || !roundId) return;
     setLoadingAction("roll");
-
     if (instanceId) {
       setPreferredInstances((prev) => ({ ...prev, [slot]: instanceId }));
     } else {
       setPreferredInstances((prev) => { const n = { ...prev }; delete n[slot]; return n; });
     }
-
     const keep: Partial<Record<WeaponSlot, number>> = {};
-    for (const s of slots) {
-      if (s.item_hash !== 0) keep[s.slot as WeaponSlot] = s.item_hash;
-    }
+    for (const s of slots) { if (s.item_hash !== 0) keep[s.slot as WeaponSlot] = s.item_hash; }
     keep[slot] = hash;
-
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -339,19 +367,9 @@ export default function LobbyRoom({
       setLockedSlots(new Set());
       setWildcardSlots(new Set());
       setPreferredInstances({});
+      setPostMatchStats(null);
       hasAutoLoaded.current = false;
     }
-    setLoadingAction(null);
-  }, [lobby.id]);
-
-  const handleEndGame = useCallback(async () => {
-    setLoadingAction("end-game");
-    await fetch("/api/lobby/end", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lobbyId: lobby.id }),
-    });
-    setShowPostMatch(true);
     setLoadingAction(null);
   }, [lobby.id]);
 
@@ -364,28 +382,77 @@ export default function LobbyRoom({
       weaponDetails={weaponDetails}
       instancePerks={instancePerks}
       collectionHashes={collectionHashes}
-      currentHashes={Object.fromEntries(
-        slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
-      )}
+      currentHashes={Object.fromEntries(slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash]))}
       onSelectWeapon={(slot, hash, instanceId) => handleSelectWeapon(slot, hash, instanceId)}
       disabled={loadingAction !== null}
     />
   ) : null;
 
-  // Game ended — show post-match screen
-  if (showPostMatch || lobbyData.status === "done") {
+  // ── Post-match overlay ──────────────────────────────────────────────────────
+  if (postMatchStats) {
+    const sorted = [...postMatchStats].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills);
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">Game Over</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Match Over</h1>
+            <p className="text-gray-400 text-sm">Round {lobbyData.current_round} results</p>
+          </div>
           <button
-            onClick={() => { router.push("/dashboard"); router.refresh(); }}
+            onClick={handleLeave}
             className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-white hover:border-gray-500 transition"
           >
-            Back to Dashboard
+            Leave Lobby
           </button>
         </div>
-        <PostMatchSummary lobbyId={lobby.id} />
+
+        <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6">
+          <h2 className="text-white font-semibold mb-4">Post-Match Summary</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-500 text-xs border-b border-bungie-border">
+                  <th className="text-left pb-2 pr-4">Player</th>
+                  <th className="text-right pb-2 pr-3">Roulette Kills</th>
+                  <th className="text-right pb-2 pr-3">K</th>
+                  <th className="text-right pb-2 pr-3">D</th>
+                  <th className="text-right pb-2 pr-3">A</th>
+                  <th className="text-right pb-2">K/D</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bungie-border/40">
+                {sorted.map((s, i) => (
+                  <tr key={s.userId} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
+                    <td className="py-2 pr-4 font-medium">{i === 0 ? "👑 " : ""}{s.displayName}</td>
+                    <td className="py-2 pr-3 text-right font-bold text-bungie-blue">{s.rouletteWeaponKills}</td>
+                    <td className="py-2 pr-3 text-right">{s.kills}</td>
+                    <td className="py-2 pr-3 text-right">{s.deaths}</td>
+                    <td className="py-2 pr-3 text-right">{s.assists}</td>
+                    <td className="py-2 text-right">{s.kd.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {isCaptain && (
+          <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
+            <p className="text-yellow-400 text-sm font-semibold mb-3">👑 Captain — ready for another round?</p>
+            <button
+              onClick={handleNextRound}
+              disabled={loadingAction === "next-round"}
+              className="px-5 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
+            >
+              {loadingAction === "next-round" ? "Starting…" : "▶ Next Round"}
+            </button>
+            <p className="text-xs text-gray-500 mt-2">Captain role will rotate to the next player.</p>
+          </div>
+        )}
+
+        {!isCaptain && (
+          <p className="text-gray-500 text-sm text-center">Waiting for captain to start the next round…</p>
+        )}
       </div>
     );
   }
@@ -400,18 +467,16 @@ export default function LobbyRoom({
             <h1 className="text-2xl font-bold text-white">Lobby</h1>
             <p className="text-gray-400 text-sm">
               Code:{" "}
-              <span className="font-mono text-bungie-blue font-bold tracking-widest">
-                {lobby.code}
-              </span>{" "}
-              — share this with your fireteam
+              <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
+              {" "}— share this with your fireteam
             </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400">Round {lobbyData.current_round}</span>
-            <button
-              onClick={handleLeave}
-              className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition"
-            >
+            {polling && (
+              <span className="text-xs text-green-500 animate-pulse">● watching for match end</span>
+            )}
+            <button onClick={handleLeave} className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition">
               Leave
             </button>
             <SignOutButton />
@@ -423,12 +488,7 @@ export default function LobbyRoom({
           <h2 className="text-white font-semibold mb-3">Fireteam ({members.length})</h2>
           <div className="flex flex-wrap gap-3">
             {members.map((m) => (
-              <div
-                key={m.id}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${
-                  m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"
-                }`}
-              >
+              <div key={m.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"}`}>
                 {m.is_captain && <span title="Captain">👑</span>}
                 <span className={m.is_ready ? "text-green-400" : "text-gray-300"}>{m.display_name}</span>
                 {m.is_ready && <span className="text-green-500 text-xs">✓</span>}
@@ -443,26 +503,14 @@ export default function LobbyRoom({
             <h2 className="text-white font-semibold mb-3">Your Character</h2>
             <div className="flex gap-3 flex-wrap">
               {characters.map((c) => (
-                <button
-                  key={c.characterId}
-                  onClick={() => setSelectedCharId(c.characterId)}
-                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition ${
-                    selectedCharId === c.characterId
-                      ? "border-bungie-blue bg-bungie-blue/20 text-white"
-                      : "border-bungie-border text-gray-400 hover:border-gray-500"
-                  }`}
-                >
+                <button key={c.characterId} onClick={() => setSelectedCharId(c.characterId)}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition ${selectedCharId === c.characterId ? "border-bungie-blue bg-bungie-blue/20 text-white" : "border-bungie-border text-gray-400 hover:border-gray-500"}`}>
                   {CLASS_NAMES[c.classType] ?? "Guardian"} · {c.light}
                 </button>
               ))}
             </div>
-            <button
-              onClick={handleReady}
-              disabled={!selectedCharId || loadingAction === "ready"}
-              className={`mt-3 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                isReady ? "bg-green-700 text-white" : "bg-bungie-blue text-white hover:opacity-90"
-              } disabled:opacity-50`}
-            >
+            <button onClick={handleReady} disabled={!selectedCharId || loadingAction === "ready"}
+              className={`mt-3 px-4 py-2 rounded-lg text-sm font-semibold transition ${isReady ? "bg-green-700 text-white" : "bg-bungie-blue text-white hover:opacity-90"} disabled:opacity-50`}>
               {loadingAction === "ready" ? "…" : isReady ? "✓ Ready" : "Mark Ready"}
             </button>
           </div>
@@ -473,29 +521,19 @@ export default function LobbyRoom({
           <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
             <h2 className="text-yellow-400 font-semibold mb-3">👑 Captain Controls</h2>
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleLoadIntersection}
-                disabled={loadingAction !== null}
-                className="px-4 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-sm text-white hover:border-gray-400 disabled:opacity-50 transition"
-              >
+              <button onClick={handleLoadIntersection} disabled={loadingAction !== null}
+                className="px-4 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-sm text-white hover:border-gray-400 disabled:opacity-50 transition">
                 {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
               </button>
               {intersection && (
                 <>
-                  <button
-                    onClick={() => handleRoll()}
-                    disabled={loadingAction !== null}
-                    className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
-                  >
+                  <button onClick={() => handleRoll()} disabled={loadingAction !== null}
+                    className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition">
                     {loadingAction === "roll" ? "Rolling…" : "🎲 Roll All"}
                   </button>
                   {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => (
-                    <button
-                      key={slot}
-                      onClick={() => handleRoll(slot)}
-                      disabled={loadingAction !== null}
-                      className="px-3 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-xs text-gray-300 hover:border-gray-400 disabled:opacity-50 transition capitalize"
-                    >
+                    <button key={slot} onClick={() => handleRoll(slot)} disabled={loadingAction !== null}
+                      className="px-3 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-xs text-gray-300 hover:border-gray-400 disabled:opacity-50 transition capitalize">
                       Reroll {SLOT_LABELS[slot]}
                     </button>
                   ))}
@@ -512,23 +550,14 @@ export default function LobbyRoom({
                   const hasRoll = slots.some((s) => s.slot === slot);
                   return (
                     <span key={slot} className="flex items-center gap-1">
-                      <button
-                        onClick={() => toggleLock(slot)}
-                        disabled={!hasRoll}
+                      <button onClick={() => toggleLock(slot)} disabled={!hasRoll}
                         title={`Lock ${SLOT_LABELS[slot]} to current rolled weapon`}
-                        className={`px-2 py-1 rounded text-xs border transition ${
-                          locked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"
-                        } disabled:opacity-30`}
-                      >
+                        className={`px-2 py-1 rounded text-xs border transition ${locked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"} disabled:opacity-30`}>
                         {locked ? "🔒" : "🔓"}
                       </button>
-                      <button
-                        onClick={() => toggleWildcard(slot)}
+                      <button onClick={() => toggleWildcard(slot)}
                         title={`? — everyone keeps their own ${SLOT_LABELS[slot].toLowerCase()} weapon`}
-                        className={`px-2 py-1 rounded text-xs border transition ${
-                          wildcard ? "border-purple-500 bg-purple-500/20 text-purple-300" : "border-bungie-border text-gray-400 hover:border-gray-400"
-                        }`}
-                      >
+                        className={`px-2 py-1 rounded text-xs border transition ${wildcard ? "border-purple-500 bg-purple-500/20 text-purple-300" : "border-bungie-border text-gray-400 hover:border-gray-400"}`}>
                         ❓
                       </button>
                       <span className="text-xs text-gray-500">{SLOT_LABELS[slot]}</span>
@@ -538,46 +567,19 @@ export default function LobbyRoom({
               </div>
             )}
 
-            {intersectionError && (
-              <div className="mt-2 text-xs text-red-400 break-all">Error: {intersectionError}</div>
-            )}
+            {intersectionError && <div className="mt-2 text-xs text-red-400 break-all">Error: {intersectionError}</div>}
             {intersection && (
               <div className="mt-2 text-xs text-gray-400">
-                Shared pool — Kinetic: {intersection.kinetic.length} · Energy:{" "}
-                {intersection.energy.length} · Power: {intersection.power.length}
+                Shared pool — Kinetic: {intersection.kinetic.length} · Energy: {intersection.energy.length} · Power: {intersection.power.length}
               </div>
             )}
-
-            {/* Round management */}
-            <div className="mt-4 pt-4 border-t border-yellow-500/20 flex flex-wrap gap-3">
-              <button
-                onClick={handleNextRound}
-                disabled={loadingAction !== null}
-                className="px-4 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-sm text-white hover:border-gray-400 disabled:opacity-50 transition"
-              >
-                {loadingAction === "next-round" ? "Advancing…" : "▶ Next Round"}
-              </button>
-              <button
-                onClick={handleEndGame}
-                disabled={loadingAction !== null}
-                className="px-4 py-2 bg-red-900/40 border border-red-800/60 rounded-lg text-sm text-red-300 hover:bg-red-900/60 disabled:opacity-50 transition"
-              >
-                {loadingAction === "end-game" ? "Ending…" : "⏹ End Game"}
-              </button>
-            </div>
           </div>
         )}
 
         {/* Loadout queue */}
         {slots.length > 0 && (
-          <LoadoutQueue
-            slots={slots}
-            weaponDetails={weaponDetails}
-            onApply={handleApply}
-            onCancelApply={handleCancelApply}
-            selectedCharId={selectedCharId}
-            loading={loadingAction === "apply"}
-          />
+          <LoadoutQueue slots={slots} weaponDetails={weaponDetails} onApply={handleApply}
+            onCancelApply={handleCancelApply} selectedCharId={selectedCharId} loading={loadingAction === "apply"} />
         )}
 
         {/* Apply results */}
