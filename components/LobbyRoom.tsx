@@ -66,6 +66,51 @@ const SLOT_MODE_CONFIG: Record<SlotMode, { icon: string; label: string; cls: str
   wildcard: { icon: "👤", label: "Your own", cls: "border-purple-500 bg-purple-500/20 text-purple-300" },
 };
 
+interface SessionTotal {
+  userId: string;
+  displayName: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  rouletteWeaponKills: number;
+  games: number;
+}
+
+// Running cumulative K/A/D per player across every recorded game this lobby.
+function SessionTotalsTable({ totals }: { totals: SessionTotal[] }) {
+  const sorted = [...totals].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-gray-500 text-xs border-b border-bungie-border">
+            <th className="text-left pb-2 pr-4">Player</th>
+            <th className="text-right pb-2 pr-3">Roulette Kills</th>
+            <th className="text-right pb-2 pr-3">K</th>
+            <th className="text-right pb-2 pr-3">A</th>
+            <th className="text-right pb-2 pr-3">D</th>
+            <th className="text-right pb-2 pr-3">K/D</th>
+            <th className="text-right pb-2">Games</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-bungie-border/40">
+          {sorted.map((s, i) => (
+            <tr key={s.userId} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
+              <td className="py-2 pr-4 font-medium">{i === 0 ? "👑 " : ""}{s.displayName}</td>
+              <td className="py-2 pr-3 text-right font-bold text-bungie-blue">{s.rouletteWeaponKills}</td>
+              <td className="py-2 pr-3 text-right">{s.kills}</td>
+              <td className="py-2 pr-3 text-right">{s.assists}</td>
+              <td className="py-2 pr-3 text-right">{s.deaths}</td>
+              <td className="py-2 pr-3 text-right">{(s.deaths > 0 ? s.kills / s.deaths : s.kills).toFixed(2)}</td>
+              <td className="py-2 text-right text-gray-500">{s.games}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function StatsTable({ stats }: { stats: PlayerStat[] }) {
   const sorted = [...stats].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills);
   return (
@@ -217,6 +262,24 @@ export default function LobbyRoom({
     // Favoriting also selects it for this slot right away.
     setMyChosenInstances((prev) => ({ ...prev, [slot]: instanceId }));
   }, []);
+
+  // Running cumulative stats per player across every recorded game this lobby.
+  const sessionTotals = useMemo(() => {
+    const m = new Map<string, SessionTotal>();
+    for (const round of roundHistory) {
+      for (const s of round.stats) {
+        const e = m.get(s.userId) ?? { userId: s.userId, displayName: s.displayName, kills: 0, deaths: 0, assists: 0, rouletteWeaponKills: 0, games: 0 };
+        e.kills += s.kills;
+        e.deaths += s.deaths;
+        e.assists += s.assists;
+        e.rouletteWeaponKills += s.rouletteWeaponKills;
+        e.games += 1;
+        e.displayName = s.displayName;
+        m.set(s.userId, e);
+      }
+    }
+    return [...m.values()];
+  }, [roundHistory]);
 
   const rerollExhausted = rerollLimit !== null && rerollsUsed >= rerollLimit;
 
@@ -818,14 +881,14 @@ export default function LobbyRoom({
           </div>
         </div>
 
-        {/* Last game results - prominent inline card, clears when captain rolls */}
-        {lastGameStats && (
+        {/* Running session totals - cumulative K/A/D across every game this lobby */}
+        {sessionTotals.length > 0 && (
           <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-white font-semibold">Last Game</h2>
-              <button onClick={() => setLastGameStats(null)} className="text-gray-600 hover:text-gray-300 text-sm leading-none">✕</button>
+              <h2 className="text-white font-semibold">Session Totals</h2>
+              <span className="text-xs text-gray-500">running K / A / D across all games</span>
             </div>
-            <StatsTable stats={lastGameStats} />
+            <SessionTotalsTable totals={sessionTotals} />
           </div>
         )}
 

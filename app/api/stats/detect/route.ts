@@ -43,7 +43,18 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existingSession) {
-      return NextResponse.json({ done: true, stats: existingSession.player_game_stats });
+      // Map snake_case DB rows to the camelCase shape the client expects, so
+      // names/numbers don't come back blank.
+      const stats = (existingSession.player_game_stats ?? []).map((s) => ({
+        userId: s.user_id,
+        displayName: s.display_name,
+        kills: s.kills,
+        deaths: s.deaths,
+        assists: s.assists,
+        kd: Number(s.kd),
+        rouletteWeaponKills: s.roulette_weapon_kills,
+      }));
+      return NextResponse.json({ done: true, stats });
     }
 
     // ── Step 3: Load members ─────────────────────────────────────────────────
