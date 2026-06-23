@@ -86,7 +86,7 @@ export default function RollDetails({
   const statRows = BAR_STATS.filter((s) => base[s] !== undefined || members.some((m) => shownFor(m)?.stats[s] !== undefined));
   const numRows = NUM_STATS.filter((s) => base[s] !== undefined || (myChosen && myChosen.stats[s] !== undefined));
 
-  const gridCols = { gridTemplateColumns: `5.5rem repeat(${members.length}, minmax(72px, 1fr))` };
+  const gridCols = { gridTemplateColumns: `5.5rem repeat(${members.length}, minmax(130px, 1fr))` };
 
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
@@ -190,12 +190,23 @@ export default function RollDetails({
                   const v = vals[i];
                   if (v === undefined) return <div key={`${s}-${m.userId}`} className="text-center text-gray-700 text-[11px]">—</div>;
                   const isBest = members.length > 1 && v === max;
-                  const delta = m.isMe && base[s] !== undefined ? v - base[s] : 0;
+                  const hasBase = base[s] !== undefined;
+                  const delta = hasBase ? v - base[s] : 0;
+                  // Segmented bar: element fill up to the lower of base/value, then
+                  // the perk difference in green (gain) or red (loss).
+                  const lo = Math.min(100, Math.max(0, Math.min(v, hasBase ? base[s] : v)));
+                  const hi = Math.min(100, Math.max(0, Math.max(v, hasBase ? base[s] : v)));
                   return (
-                    <div key={`${s}-${m.userId}`} className="text-center tabular-nums text-[11px]">
-                      <span className={isBest ? `${theme.text} font-semibold` : "text-gray-300"}>{v}</span>
-                      {delta !== 0 && (
-                        <span className={`ml-0.5 text-[9px] ${delta > 0 ? "text-green-400" : "text-red-400"}`}>
+                    <div key={`${s}-${m.userId}`} className="flex items-center gap-1.5">
+                      <div className="flex-1 h-1.5 bg-gray-700/80 rounded-full overflow-hidden flex">
+                        <div className={`h-full ${theme.fill}`} style={{ width: `${lo}%` }} />
+                        {hi > lo && (
+                          <div className={`h-full ${delta >= 0 ? "bg-green-400" : "bg-red-500/80"}`} style={{ width: `${hi - lo}%` }} />
+                        )}
+                      </div>
+                      <span className={`w-5 text-right tabular-nums text-[11px] ${isBest ? `${theme.text} font-semibold` : "text-gray-300"}`}>{v}</span>
+                      {m.isMe && delta !== 0 && (
+                        <span className={`w-6 text-right text-[9px] tabular-nums ${delta > 0 ? "text-green-400" : "text-red-400"}`}>
                           {delta > 0 ? `+${delta}` : delta}
                         </span>
                       )}
