@@ -55,39 +55,38 @@ let supabasePerkCachePromise: Promise<Record<string, string>> | null = null;
 const pendingDefs = new Map<number, WeaponDefinition>();
 const pendingPerks = new Map<number, string>();
 
-function emptyDefRecord(): Record<string, WeaponDefinition> {
-  return {};
-}
-function emptyStringRecord(): Record<string, string> {
-  return {};
-}
-
 function loadSupabaseDefCache(): Promise<Record<string, WeaponDefinition>> {
   if (!supabaseDefCachePromise) {
-    supabaseDefCachePromise = adminSupabase
-      .from("cached_manifest_metadata")
-      .select("items_json")
-      .eq("version", "weapon_defs")
-      .single()
-      .then(
-        ({ data }) => (data?.items_json ?? {}) as Record<string, WeaponDefinition>
-      )
-      .catch(emptyDefRecord);
+    supabaseDefCachePromise = (async () => {
+      try {
+        const { data } = await adminSupabase
+          .from("cached_manifest_metadata")
+          .select("items_json")
+          .eq("version", "weapon_defs")
+          .single();
+        return (data?.items_json ?? {}) as Record<string, WeaponDefinition>;
+      } catch {
+        return {};
+      }
+    })();
   }
   return supabaseDefCachePromise;
 }
 
 function loadSupabasePerkCache(): Promise<Record<string, string>> {
   if (!supabasePerkCachePromise) {
-    supabasePerkCachePromise = adminSupabase
-      .from("cached_manifest_metadata")
-      .select("sandbox_perks_json")
-      .eq("version", "perk_names")
-      .single()
-      .then(
-        ({ data }) => (data?.sandbox_perks_json ?? {}) as Record<string, string>
-      )
-      .catch(emptyStringRecord);
+    supabasePerkCachePromise = (async () => {
+      try {
+        const { data } = await adminSupabase
+          .from("cached_manifest_metadata")
+          .select("sandbox_perks_json")
+          .eq("version", "perk_names")
+          .single();
+        return (data?.sandbox_perks_json ?? {}) as Record<string, string>;
+      } catch {
+        return {};
+      }
+    })();
   }
   return supabasePerkCachePromise;
 }
