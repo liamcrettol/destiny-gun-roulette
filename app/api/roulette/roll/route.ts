@@ -26,11 +26,12 @@ const schema = z.object({
     energy: z.number().optional(),
     power: z.number().optional(),
   }).optional(),
-  // Previous roll per slot, to avoid repeating the same gun back-to-back.
+  // Recent rolls per slot (most-recent first), to avoid repeating a gun that
+  // came up in the last few rolls.
   avoid: z.object({
-    kinetic: z.number().optional(),
-    energy: z.number().optional(),
-    power: z.number().optional(),
+    kinetic: z.array(z.number()).optional(),
+    energy: z.array(z.number()).optional(),
+    power: z.array(z.number()).optional(),
   }).optional(),
   wildcardSlots: z.array(z.enum(["kinetic", "energy", "power"])).optional(),
 });
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
       filteredIntersection,
       body.weaponDetails,
       exclude as Partial<Record<WeaponSlot, number>>,
-      body.avoid as Partial<Record<WeaponSlot, number>> | undefined
+      body.avoid as Partial<Record<WeaponSlot, number[]>> | undefined
     );
 
     // Upsert rolled slots

@@ -87,17 +87,20 @@ export function rollLoadout(
   intersection: Record<WeaponSlot, number[]>,
   weaponDetails: Record<string, WeaponDetail>,
   exclude?: Partial<Record<WeaponSlot, number>>,
-  // Per-slot weapon to avoid repeating (the previous roll). Soft: only applied
-  // when the slot's pool has at least one other option.
-  avoid?: Partial<Record<WeaponSlot, number>>
+  // Recent weapons per slot (most-recent first) to avoid repeating. Soft: if
+  // avoiding the whole window would empty the pool, it relaxes to exclude as
+  // many of the most-recent picks as the pool allows (always leaves ≥1).
+  avoid?: Partial<Record<WeaponSlot, number[]>>
 ): Record<WeaponSlot, number | null> {
-  // Drop the just-rolled weapon from a pool so the same gun doesn't come up
-  // twice in a row — unless it's the only option for that slot.
   const dropAvoided = (pool: number[], slot: WeaponSlot): number[] => {
-    const a = avoid?.[slot];
-    if (a == null) return pool;
-    const without = pool.filter((h) => h !== a);
-    return without.length > 0 ? without : pool;
+    const recent = avoid?.[slot];
+    if (!recent?.length) return pool;
+    for (let n = recent.length; n >= 1; n--) {
+      const window = new Set(recent.slice(0, n));
+      const without = pool.filter((h) => !window.has(h));
+      if (without.length > 0) return without;
+    }
+    return pool;
   };
   // Treat 0 (the "your own / wildcard" sentinel) as not-kept so it can never pin
   // a slot to an empty value — a kept slot must be a real item hash.

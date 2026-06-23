@@ -43,6 +43,8 @@ const CLASS_NAMES: Record<number, string> = { 0: "Titan", 1: "Hunter", 2: "Warlo
 const CLASS_ORDER = [2, 1, 0];
 const SLOT_LABELS: Record<WeaponSlot, string> = { kinetic: "Kinetic", energy: "Energy", power: "Power" };
 const POLL_INTERVAL_MS = 30_000;
+// How many recent weapons per slot to avoid repeating on a roll.
+const ROLL_HISTORY_SIZE = 4;
 
 // Per-slot mode cycle: Random → Locked → Your own.
 type SlotMode = "normal" | "lock" | "wildcard";
@@ -126,6 +128,16 @@ export default function LobbyRoom({
   const [mvpPlayer, setMvpPlayer] = useState<PlayerStat | null>(null);
   const prevLastGameStatsRef = useRef<PlayerStat[] | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Recent weapons per slot (most-recent first), so rolls can avoid repeating
+  // any of the last few picks — not just the immediately previous one.
+  const recentRollsRef = useRef<Record<WeaponSlot, number[]>>({ kinetic: [], energy: [], power: [] });
+  const recordRoll = useCallback((slot: WeaponSlot, hash: number) => {
+    if (!hash) return;
+    const hist = recentRollsRef.current[slot];
+    if (hist[0] === hash) return; // unchanged, don't duplicate
+    recentRollsRef.current[slot] = [hash, ...hist.filter((h) => h !== hash)].slice(0, ROLL_HISTORY_SIZE);
+  }, []);
 
   const copyCode = useCallback(async () => {
     try {
@@ -277,6 +289,7 @@ export default function LobbyRoom({
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const s = payload.new as LobbyLoadoutSlot;
             if (roundIdRef.current && s.round_id !== roundIdRef.current) return;
+            if (s.item_hash !== 0) recordRoll(s.slot as WeaponSlot, s.item_hash);
             setSlots((prev) => [...prev.filter((x) => x.slot !== s.slot), s]);
           }
         }
@@ -325,7 +338,12 @@ export default function LobbyRoom({
           .from("lobby_loadout_slots")
           .select("*")
           .eq("round_id", round.id);
-        if (existingSlots) setSlots(existingSlots);
+        if (existingSlots) {
+          setSlots(existingSlots);
+          for (const s of existingSlots) {
+            if (s.item_hash !== 0) recordRoll(s.slot as WeaponSlot, s.item_hash);
+          }
+        }
       }
     }
     loadCurrentRound();
@@ -409,9 +427,7 @@ export default function LobbyRoom({
       if (s.item_hash === 0) continue;
       keep[sl] = s.item_hash;
     }
-    const avoid = Object.fromEntries(
-      slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
-    );
+    const avoid = { ...recentRollsRef.current };
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -472,10 +488,8 @@ export default function LobbyRoom({
       });
       if (kept.length > 0) keepSlots = Object.fromEntries(kept.map((s) => [s.slot, s.item_hash]));
     }
-    // Avoid repeating the current weapon in any slot we're about to re-roll
-    const avoid = Object.fromEntries(
-      slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash])
-    );
+    // Avoid repeating any of the last few weapons per slot
+    const avoid = { ...recentRollsRef.current };
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
