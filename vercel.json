@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/detect-games",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
