@@ -126,6 +126,7 @@ export default function LobbyRoom({
   const [polling, setPolling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedWatch, setCopiedWatch] = useState(false);
   const [mvpPlayer, setMvpPlayer] = useState<PlayerStat | null>(null);
   const prevLastGameStatsRef = useRef<PlayerStat[] | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -205,6 +206,16 @@ export default function LobbyRoom({
       await navigator.clipboard.writeText(`${window.location.origin}/join/${lobby.code}`);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 1500);
+    } catch {
+      // clipboard unavailable; ignore
+    }
+  }, [lobby.code]);
+
+  const copyWatchLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/watch/${lobby.code}`);
+      setCopiedWatch(true);
+      setTimeout(() => setCopiedWatch(false), 1500);
     } catch {
       // clipboard unavailable; ignore
     }
@@ -667,6 +678,12 @@ export default function LobbyRoom({
                 className="text-xs px-2 py-0.5 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition"
               >
                 {copiedLink ? "✓ Link copied" : "Copy invite link"}
+              </button>
+              <button
+                onClick={copyWatchLink}
+                className="text-xs px-2 py-0.5 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition"
+              >
+                {copiedWatch ? "✓ Spectator copied" : "Copy spectator link"}
               </button>
             </div>
           </div>
