@@ -13,24 +13,22 @@ export default async function Home() {
           Gun Roulette
         </h1>
         <p className="text-gray-400 text-lg max-w-md">
-          Randomly assign Destiny 2 loadouts to your whole fireteam and auto-equip
-          them between rounds.
+          Roll random loadouts for your whole fireteam and equip them in one click.
         </p>
       </div>
 
       <div className="flex flex-col items-center gap-4 w-full max-w-sm">
         <SignInButton />
         <p className="text-xs text-gray-500 text-center">
-          Signing in grants Gun Roulette permission to read your inventory and
-          equip items on your behalf. All friends must sign in separately.
+          Signing in lets us read your inventory and equip weapons. Everyone in the group needs to sign in.
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mt-8 max-w-2xl text-center">
         {[
-          { icon: "🎲", title: "Random Rolls", desc: "Pick weapons every member owns" },
-          { icon: "⚡", title: "Auto-Equip", desc: "One click applies loadouts for everyone" },
-          { icon: "👑", title: "Captain System", desc: "Rotating pick order, no arguments" },
+          { icon: "🎲", title: "Random Rolls", desc: "Only rolls weapons everyone has" },
+          { icon: "⚡", title: "Auto-Equip", desc: "Equips the whole fireteam at once" },
+          { icon: "👑", title: "Captain System", desc: "Captain rotates every game" },
         ].map((f) => (
           <div key={f.title} className="bg-bungie-surface rounded-lg p-4 border border-bungie-border">
             <div className="text-3xl mb-2">{f.icon}</div>
