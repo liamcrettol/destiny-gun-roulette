@@ -121,7 +121,21 @@ export default function LobbyRoom({
   const [roundHistory, setRoundHistory] = useState<RoundRecord[]>([]);
   const [expandedRound, setExpandedRound] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  const [copied, setCopied] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const copyCode = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(lobby.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard unavailable; ignore
+    }
+  }, [lobby.code]);
+
+  // Stats only record once at least two players have picked a guardian.
+  const charactersPicked = members.filter((m) => m.selected_character_id).length;
 
   const applyAbortRef = useRef<AbortController | null>(null);
   const roundIdRef = useRef<string | null>(null);
@@ -496,10 +510,18 @@ export default function LobbyRoom({
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Lobby</h1>
-            <p className="text-gray-400 text-sm">
-              Code: <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
-              {" "}· share with your fireteam
-            </p>
+            <div className="text-gray-400 text-sm flex items-center gap-2 flex-wrap mt-0.5">
+              <span>
+                Code: <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
+              </span>
+              <button
+                onClick={copyCode}
+                className="text-xs px-2 py-0.5 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition"
+              >
+                {copied ? "✓ Copied" : "Copy code"}
+              </button>
+              <span className="text-gray-500">share with your fireteam</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400">Round {lobbyData.current_round}</span>
@@ -536,6 +558,11 @@ export default function LobbyRoom({
               </div>
             ))}
           </div>
+          {charactersPicked < 2 && (
+            <p className="mt-3 text-xs text-amber-400/90">
+              ⚠ Stats won&apos;t track until at least 2 players pick a guardian ({charactersPicked}/2).
+            </p>
+          )}
         </div>
 
         {/* Character picker - selecting your guardian is all a player needs to do */}

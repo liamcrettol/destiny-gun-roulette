@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/supabase/admin";
+import { requireSession } from "@/lib/auth/helpers";
 
 const LOBBY_ID = "00000000-0000-0000-0000-000000000001";
 const LOBBY_CODE = "TEST01";
+
+// This endpoint writes/wipes test data, so require a logged-in session — it must
+// not be callable anonymously in production.
+async function requireAuth(): Promise<NextResponse | null> {
+  try {
+    await requireSession();
+    return null;
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
 
 const USERS = [
   { id: "test_bungie_001", display_name: "SolarFlare99" },
@@ -65,6 +77,8 @@ const GAMES = [
 ];
 
 export async function POST() {
+  const unauthorized = await requireAuth();
+  if (unauthorized) return unauthorized;
   try {
     // 1. Upsert test users
     const { error: userErr } = await adminSupabase
@@ -135,6 +149,8 @@ export async function POST() {
 }
 
 export async function DELETE() {
+  const unauthorized = await requireAuth();
+  if (unauthorized) return unauthorized;
   await adminSupabase.from("lobbies").delete().eq("id", LOBBY_ID);
   await adminSupabase.from("users").delete().like("id", "test_bungie_%");
   return NextResponse.json({ ok: true, message: "Test data cleared." });
