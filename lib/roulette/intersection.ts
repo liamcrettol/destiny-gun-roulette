@@ -59,17 +59,24 @@ const ARCHETYPE_RULES: Record<string, string[]> = {
   "Shotgun": ["Pulse Rifle", "Scout Rifle", "Combat Bow", "Auto Rifle", "Hand Cannon"],
 };
 
-type WeaponDetail = { weaponType: string; tierType?: number; damageType?: string };
+type WeaponDetail = { weaponType: string; tierType?: number; damageType?: string; stats?: Record<string, number> };
 
 export type RollMode = "normal" | "chaos" | "meta" | "element";
 
-// A rough PvP-leaning "meta" allowlist for the Meta mode. Falls back to the
-// full pool per slot if none of these exist there (never empties a slot).
-const META_TYPES = new Set([
-  "Hand Cannon", "Pulse Rifle", "Submachine Gun", "Sidearm",
-  "Shotgun", "Sniper Rifle", "Fusion Rifle", "Glaive",
-  "Rocket Launcher", "Sword", "Linear Fusion Rifle", "Machine Gun", "Grenade Launcher",
-]);
+// Crucible "meta" frames for the Meta mode, identified by archetype RPM:
+//   Hand Cannon  — 120 (Aggressive) / 140 (Adaptive)
+//   Shotgun      —  55 (Aggressive) /  65 (Precision)
+//   Sniper Rifle —  72 (Aggressive) /  90 (Adaptive)
+// Everything else (incl. all power weapons) falls through, so the Meta pool is
+// just these primaries/specials. Falls back to the full pool if a slot has none.
+function isMetaWeapon(d?: WeaponDetail): boolean {
+  const rpm = d?.stats?.RPM;
+  if (rpm == null) return false;
+  if (d!.weaponType === "Hand Cannon") return rpm === 120 || rpm === 140;
+  if (d!.weaponType === "Shotgun") return rpm === 55 || rpm === 65;
+  if (d!.weaponType === "Sniper Rifle") return rpm === 72 || rpm === 90;
+  return false;
+}
 
 function applyPairingRule(
   pool: number[],
@@ -144,10 +151,10 @@ export function rollLoadout(
 
   const damageOf = (h: number) => weaponDetails[h.toString()]?.damageType;
 
-  // Meta mode: restrict to a PvP-leaning archetype allowlist (soft).
+  // Meta mode: restrict to the meta frames above (soft).
   const applyMeta = (pool: number[]): number[] => {
     if (mode !== "meta") return pool;
-    const filtered = pool.filter((h) => META_TYPES.has(weaponDetails[h.toString()]?.weaponType ?? ""));
+    const filtered = pool.filter((h) => isMetaWeapon(weaponDetails[h.toString()]));
     return filtered.length > 0 ? filtered : pool;
   };
 

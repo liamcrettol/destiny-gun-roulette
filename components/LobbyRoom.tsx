@@ -788,7 +788,7 @@ export default function LobbyRoom({
                     >
                       <option value="normal">Normal (paired)</option>
                       <option value="chaos">Chaos (anything)</option>
-                      <option value="meta">Meta (strong archetypes)</option>
+                      <option value="meta">Meta (HC + shotgun/sniper)</option>
                       <option value="element">Same Element</option>
                     </select>
                   </label>
