@@ -100,7 +100,7 @@ function WeaponCard({
       onMouseEnter={(e) => onHover(hash, e.currentTarget)}
       onMouseLeave={onLeave}
     >
-      {/* Main card row — selects the weapon (clears any specific roll) */}
+      {/* Main card row - selects the weapon (clears any specific roll) */}
       <button
         onClick={() => onSelect(hash)}
         disabled={disabled}
@@ -147,7 +147,7 @@ function WeaponCard({
         </div>
       </button>
 
-      {/* Roll picker — only for weapons with >1 roll */}
+      {/* Roll picker - only for weapons with >1 roll */}
       {hasMultiple && (
         isActive ? (
           <div className="border-t border-bungie-border/50 bg-gray-900/40 px-2 py-2 space-y-0.5">
@@ -159,7 +159,7 @@ function WeaponCard({
             </p>
             <RollRow
               title="🎲 Any roll"
-              perks={["best available — easiest to equip"]}
+              perks={["best available - easiest to equip"]}
               selected={!currentInstance}
               onClick={() => onSelect(hash)}
               disabled={disabled}
@@ -183,7 +183,7 @@ function WeaponCard({
             className="w-full border-t border-bungie-border/50 px-3 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition flex items-center gap-1.5 disabled:opacity-40"
           >
             <span className="text-bungie-blue">◆</span>
-            {rolls.length} rolls available — select to pick one
+            {rolls.length} rolls available - select to pick one
           </button>
         )
       )}

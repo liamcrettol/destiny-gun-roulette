@@ -1,5 +1,5 @@
 -- ============================================================
--- 004 — Post-match stats tracking
+-- 004 - Post-match stats tracking
 -- ============================================================
 
 create table if not exists game_sessions (

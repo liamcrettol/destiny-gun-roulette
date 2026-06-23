@@ -85,7 +85,7 @@ export default async function Leaderboard() {
                     <span className="text-gray-600">-</span>
                     <span className="text-red-400">{e.losses}</span></>
                   ) : (
-                    <span className="text-gray-600">—</span>
+                    <span className="text-gray-600"> - </span>
                   )}
                 </td>
                 <td className="py-2 text-right">{e.avg_kd.toFixed(2)}</td>

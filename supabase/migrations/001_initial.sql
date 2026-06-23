@@ -1,5 +1,5 @@
 -- ============================================================
--- Destiny Gun Roulette — Initial Schema
+-- Destiny Gun Roulette - Initial Schema
 -- Run this in Supabase SQL Editor or via psql
 -- ============================================================
 
@@ -135,7 +135,7 @@ alter table users enable row level security;
 alter table bungie_accounts enable row level security;
 alter table cached_manifest_metadata enable row level security;
 
--- Service role bypasses all RLS — all writes go through service role server-side.
+-- Service role bypasses all RLS - all writes go through service role server-side.
 -- Anon users can read lobby info (for the realtime subscription in browser).
 create policy "anon read lobbies" on lobbies for select using (true);
 create policy "anon read lobby_members" on lobby_members for select using (true);

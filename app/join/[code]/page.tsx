@@ -8,7 +8,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   const upper = code.toUpperCase();
 
   if (!session?.userId) {
-    // Not signed in — send to home, they can sign in and then enter the code manually
+    // Not signed in - send to home, they can sign in and then enter the code manually
     redirect(`/?code=${upper}`);
   }
 

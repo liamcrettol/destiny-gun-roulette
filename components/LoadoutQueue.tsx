@@ -4,8 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { LobbyLoadoutSlot } from "@/types/lobby";
 import { type WeaponDetail, type InstancePerk, useWeaponTooltip } from "./weaponShared";
-import { playTick, playReveal, playPick } from "./rollSound";
-
 type AnimKind = "roll" | "pick";
 
 const SLOT_LABELS: Record<string, string> = {
@@ -32,14 +30,14 @@ const SPIN_STEP_MS = 60;
 const SPIN_TOTAL_MS = 700;
 
 // Slot-machine slot: when the weapon hash changes, flicker through random
-// pooled icons for a beat, then snap to the final and play a reveal sound.
-// The name/type/damage are held back ("Rolling…") until the icon settles, so
-// the result isn't spoiled before the spin finishes.
+// pooled icons for a beat, then snap to the final. The name/type/damage are
+// held back ("Rolling...") until the icon settles, so the result isn't
+// spoiled before the spin finishes.
 function WeaponSlotContent({
-  hash, icon, watermark, name, weaponType, damageType, isCollection, iconPool, exotic, slot, animKindRef,
+  hash, icon, watermark, name, weaponType, damageType, isCollection, iconPool, slot, animKindRef,
 }: {
   hash: number; icon: string; watermark?: string; name: string; weaponType: string;
-  damageType: string; isCollection: boolean; iconPool: string[]; exotic: boolean;
+  damageType: string; isCollection: boolean; iconPool: string[];
   slot: string; animKindRef?: React.MutableRefObject<Record<string, AnimKind>>;
 }) {
   const [displayIcon, setDisplayIcon] = useState(icon);
@@ -57,13 +55,12 @@ function WeaponSlotContent({
 
     const kind: AnimKind = animKindRef?.current[slot] ?? "roll";
 
-    // Manual pick from the browser: no shuffle — snap in with a quick pop.
+    // Manual pick from the browser: no shuffle - snap in with a quick pop.
     if (kind === "pick" || iconPool.length < 2) {
       setDisplayIcon(icon);
       setSpinning(false);
       setPicked(true);
       setPopKey((k) => k + 1);
-      playPick();
       const t = setTimeout(() => setPicked(false), 600);
       return () => clearTimeout(t);
     }
@@ -74,16 +71,14 @@ function WeaponSlotContent({
     const id = setInterval(() => {
       elapsed += SPIN_STEP_MS;
       setDisplayIcon(iconPool[Math.floor(Math.random() * iconPool.length)]);
-      playTick();
       if (elapsed >= SPIN_TOTAL_MS) {
         clearInterval(id);
         setDisplayIcon(icon);
         setSpinning(false);
-        playReveal(exotic);
       }
     }, SPIN_STEP_MS);
     return () => clearInterval(id);
-  }, [hash, icon, exotic, iconPool, slot, animKindRef]);
+  }, [hash, icon, iconPool, slot, animKindRef]);
 
   return (
     <>
@@ -185,7 +180,6 @@ export default function LoadoutQueue({
                   damageType={slot.damage_type}
                   isCollection={collectionHashes.has(slot.item_hash)}
                   iconPool={iconPool}
-                  exotic={weaponDetails[slot.item_hash]?.tierType === 6}
                   slot={slotName}
                   animKindRef={animKindRef}
                 />

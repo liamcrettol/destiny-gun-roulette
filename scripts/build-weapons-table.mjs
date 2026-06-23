@@ -1,7 +1,7 @@
 // Regenerates the prebuilt weapon + perk tables from Bungie's manifest.
 //
 // The full DestinyInventoryItemDefinition is ~190 MB, so we never load it at
-// runtime — this script extracts the compact tables the app ships with:
+// runtime - this script extracts the compact tables the app ships with:
 //   lib/bungie/data/weapons-table.json  (weapons only, with season watermarks)
 //   lib/bungie/data/perk-names.json     (plug/perk hash -> display name)
 //   lib/bungie/data/manifest-version.txt (the Bungie manifest version)

@@ -146,11 +146,11 @@ function FloatingTooltip({
 
         {isCollection && (
           <p className="mt-2 text-[11px] text-amber-300/90 leading-snug">
-            Not everyone owns this — each player pulls it from Collections in-game before applying.
+            Not everyone owns this - each player pulls it from Collections in-game before applying.
           </p>
         )}
 
-        {/* Per-instance perk rolls — clean comma-separated text, not pill walls */}
+        {/* Per-instance perk rolls - clean comma-separated text, not pill walls */}
         {rolls.length > 0 && (
           <div className="mt-3 pt-3 border-t border-bungie-border/60 space-y-2">
             {rolls.map((inst, i) => (
@@ -205,7 +205,7 @@ export function useWeaponTooltip(
 ) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Capture the anchor element's rect once, on enter — no per-move updates.
+  // Capture the anchor element's rect once, on enter - no per-move updates.
   const onHover = useCallback((hash: number, el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     setTooltip({ hash, rect: { top: r.top, left: r.left, right: r.right, width: r.width, height: r.height } });

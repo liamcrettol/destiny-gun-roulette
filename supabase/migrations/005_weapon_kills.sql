@@ -1,5 +1,5 @@
 -- ============================================================
--- 005 — Per-weapon kill tracking for Hall of Fame
+-- 005 - Per-weapon kill tracking for Hall of Fame
 -- ============================================================
 
 create table if not exists weapon_round_kills (

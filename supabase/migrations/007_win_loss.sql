@@ -1,5 +1,5 @@
 -- ============================================================
--- 007 — Win/loss tracking per player per game
+-- 007 - Win/loss tracking per player per game
 -- ============================================================
 -- PvP PGCRs expose a per-player "standing" (0 = win, 1 = loss). PvE games
 -- have no standing, so this stays null there.

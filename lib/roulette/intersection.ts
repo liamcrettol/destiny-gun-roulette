@@ -36,14 +36,14 @@ export function findBestInstance(
   );
 }
 
-// Archetype pairing rules — pair a primary with a complementary special so the
+// Archetype pairing rules - pair a primary with a complementary special so the
 // loadout covers both ranges.
 //   Short-range primary (SMG, Sidearm)        → Sniper Rifle (long-range special)
 //   Long-range primary (Pulse, Scout, Bow)    → Shotgun      (close-range special)
 //   Mid-range primary (Auto Rifle, Hand Cannon) → either Sniper or Shotgun
 // Rules are bidirectional: keyed by whichever slot is decided first, the value
 // constrains the other slot. So a rolled special pulls a fitting primary and a
-// rolled primary pulls its matching special — never two specials with no primary.
+// rolled primary pulls its matching special - never two specials with no primary.
 // Falls back to unrestricted if none of the allowed types exist in the pool.
 const ARCHETYPE_RULES: Record<string, string[]> = {
   // Primaries → complementary special(s)
@@ -59,7 +59,7 @@ const ARCHETYPE_RULES: Record<string, string[]> = {
   "Shotgun": ["Pulse Rifle", "Scout Rifle", "Combat Bow", "Auto Rifle", "Hand Cannon"],
 };
 
-// Mismatch mode — the INVERSE of the pairing rules above. Deliberately bad
+// Mismatch mode - the INVERSE of the pairing rules above. Deliberately bad
 // range coverage for a challenge: short primaries get a close-range special and
 // long primaries get a long-range special (no complementary coverage).
 //   SMG / Sidearm   → Shotgun     (close + close)
@@ -82,9 +82,9 @@ type WeaponDetail = { weaponType: string; tierType?: number; damageType?: string
 export type RollMode = "normal" | "chaos" | "meta" | "mismatch";
 
 // Crucible "meta" frames for the Meta mode, identified by archetype RPM:
-//   Hand Cannon  — 120 (Aggressive) / 140 (Adaptive)
-//   Shotgun      —  55 (Aggressive) /  65 (Precision)
-//   Sniper Rifle —  72 (Aggressive) /  90 (Adaptive)
+//   Hand Cannon - 120 (Aggressive) / 140 (Adaptive)
+//   Shotgun - 55 (Aggressive) /  65 (Precision)
+//   Sniper Rifle - 72 (Aggressive) /  90 (Adaptive)
 // Everything else (incl. all power weapons) falls through, so the Meta pool is
 // just these primaries/specials. Falls back to the full pool if a slot has none.
 function isMetaWeapon(d?: WeaponDetail): boolean {
@@ -140,7 +140,7 @@ export function rollLoadout(
     return pool;
   };
   // Treat 0 (the "your own / wildcard" sentinel) as not-kept so it can never pin
-  // a slot to an empty value — a kept slot must be a real item hash.
+  // a slot to an empty value - a kept slot must be a real item hash.
   const keep: Partial<Record<WeaponSlot, number>> = {};
   for (const s of ["kinetic", "energy", "power"] as WeaponSlot[]) {
     const v = exclude?.[s];
@@ -157,7 +157,7 @@ export function rollLoadout(
   const isExotic = (h: number | null | undefined) =>
     h != null && (weaponDetails[h.toString()]?.tierType ?? 5) === 6;
   // An exotic the player explicitly locked/selected (in any slot, incl. power)
-  // claims the single exotic slot — every rolled slot must then stay non-exotic.
+  // claims the single exotic slot - every rolled slot must then stay non-exotic.
   const keptExotic = isExotic(keep.kinetic) || isExotic(keep.energy) || isExotic(keep.power);
 
   // Drop exotics from a pool when an exotic is already committed elsewhere.

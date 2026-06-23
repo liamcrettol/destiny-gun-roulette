@@ -147,7 +147,7 @@ export default async function PlayerStatsPage({ params }: { params: Promise<{ us
                 const session = row.game_sessions as { played_at: string } | null;
                 const date = session?.played_at
                   ? new Date(session.played_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
-                  : "—";
+                  : " - ";
                 return (
                   <tr key={row.id} className="text-gray-300 hover:bg-bungie-dark/30 transition">
                     <td className="px-4 py-2.5 text-gray-500 text-xs">{date}</td>

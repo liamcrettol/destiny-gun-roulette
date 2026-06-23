@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     // Slots whose weapon isn't in this player's inventory/vault. The only way
     // that happens here is a Collections-only exotic (the intersection lets the
     // captain pick those). Bungie has no "pull from Collections" API, so we
-    // can't auto-equip it — surface a clear message instead of silently
+    // can't auto-equip it - surface a clear message instead of silently
     // skipping the slot.
     const missing: ApplyResult[] = [];
     for (const slot of slots) {
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
           slot: slot.slot as WeaponSlot,
           item_hash: slot.item_hash,
           success: false,
-          error: `Not in inventory — pull ${slot.weapon_name} from Collections in-game, then Apply again`,
+          error: `Not in inventory - pull ${slot.weapon_name} from Collections in-game, then Apply again`,
         });
         continue;
       }

@@ -25,13 +25,13 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    // No apply has happened for this lobby yet — nothing to detect
+    // No apply has happened for this lobby yet - nothing to detect
     if (!recentHistory?.applied_at) return NextResponse.json({ done: false, pending: false });
 
     const appliedAt = recentHistory.applied_at as string;
 
     // ── Step 2: Check if a session already exists for THIS round ───────────
-    // Only look for sessions created after the most recent apply — never
+    // Only look for sessions created after the most recent apply - never
     // return a session from a previous round.
     const { data: existingSession } = await adminSupabase
       .from("game_sessions")
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     // ── Step 5: Hit Bungie PGCR ──────────────────────────────────────────────
     const token = await getBungieToken(session.userId);
     const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, session.userId);
-    // PGCR not found yet — game is in progress or hasn't appeared on Bungie's servers
+    // PGCR not found yet - game is in progress or hasn't appeared on Bungie's servers
     if (!result) return NextResponse.json({ done: false, pending: true });
 
     const { playerStats, weaponKills } = result;

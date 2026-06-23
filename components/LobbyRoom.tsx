@@ -139,7 +139,7 @@ export default function LobbyRoom({
   const [showRollSettings, setShowRollSettings] = useState(false);
 
   // Recent weapons per slot (most-recent first), so rolls can avoid repeating
-  // any of the last few picks — not just the immediately previous one.
+  // any of the last few picks - not just the immediately previous one.
   const recentRollsRef = useRef<Record<WeaponSlot, number[]>>({ kinetic: [], energy: [], power: [] });
   // Why each slot last changed, so the loadout animates a spin (roll) vs a
   // quick pop (manual browser pick).
@@ -173,7 +173,7 @@ export default function LobbyRoom({
 
   const rerollExhausted = rerollLimit !== null && rerollsUsed >= rerollLimit;
 
-  // Pool with banned weapon types removed — drives both the browser and rolls.
+  // Pool with banned weapon types removed - drives both the browser and rolls.
   const effectiveIntersection = useMemo(() => {
     if (!intersection) return null;
     if (bannedTypes.size === 0) return intersection;
@@ -946,7 +946,7 @@ export default function LobbyRoom({
                         {round.cursed && (
                           <p className="mt-3 text-xs text-gray-500">
                             💀 Most cursed: <span className="text-gray-300">{round.cursed.name}</span>
-                            {" "}— {round.cursed.kills} {round.cursed.kills === 1 ? "kill" : "kills"}
+                            {" "} - {round.cursed.kills} {round.cursed.kills === 1 ? "kill" : "kills"}
                           </p>
                         )}
                       </div>

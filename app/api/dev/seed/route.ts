@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/auth/helpers";
 const LOBBY_ID = "00000000-0000-0000-0000-000000000001";
 const LOBBY_CODE = "TEST01";
 
-// This endpoint writes/wipes test data, so require a logged-in session — it must
+// This endpoint writes/wipes test data, so require a logged-in session - it must
 // not be callable anonymously in production.
 async function requireAuth(): Promise<NextResponse | null> {
   try {

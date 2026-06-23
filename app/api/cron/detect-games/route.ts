@@ -6,7 +6,7 @@ import { rotateCaptain } from "@/lib/lobby";
 
 // Vercel Cron calls this every 5 minutes with Authorization: Bearer CRON_SECRET.
 // It finds lobbies that have a pending apply but no saved game session and runs
-// PGCR detection for each — so stats get captured even when nobody has the page open.
+// PGCR detection for each - so stats get captured even when nobody has the page open.
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
           tokenOwnerUserId = m.userId;
           break;
         } catch {
-          // this member's token expired and can't refresh — try the next
+          // this member's token expired and can't refresh - try the next
         }
       }
 
