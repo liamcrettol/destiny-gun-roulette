@@ -66,17 +66,42 @@ export default function RollDetails({
   rolls,
   chosenInstances,
   onChooseInstance,
+  loading,
+  error,
+  onRetry,
 }: {
   rolls: RollsData;
   // The current player's chosen instanceId per slot (for swap + apply).
   chosenInstances: Partial<Record<WeaponSlot, string>>;
   onChooseInstance: (slot: WeaponSlot, instanceId: string) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const [tab, setTab] = useState<WeaponSlot>("kinetic");
   const [compare, setCompare] = useState(false);
 
   const present = SLOT_ORDER.filter((s) => rolls[s]);
-  if (present.length === 0) return null;
+
+  // Loading / error / not-yet-loaded states so the panel is always visible.
+  if (present.length === 0) {
+    return (
+      <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-semibold text-sm">Your Roll</h2>
+          {onRetry && !loading && (
+            <button onClick={onRetry} className="text-xs px-2 py-1 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition">
+              Refresh
+            </button>
+          )}
+        </div>
+        <p className="text-gray-500 text-xs mt-2">
+          {loading ? "Loading your rolls..." : error ? `Couldn't load rolls: ${error}` : "Roll a loadout to see your rolls."}
+        </p>
+      </div>
+    );
+  }
+
   const activeTab = rolls[tab] ? tab : present[0];
   const slot = rolls[activeTab]!;
 
@@ -87,8 +112,10 @@ export default function RollDetails({
 
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-bungie-border flex items-center justify-between">
-        <h2 className="text-white font-semibold text-sm">Your Roll</h2>
+      <div className="px-4 py-3 border-b border-bungie-border flex items-center justify-between gap-2">
+        <h2 className="text-white font-semibold text-sm">
+          Your Roll {loading && <span className="text-gray-500 font-normal text-xs">· refreshing…</span>}
+        </h2>
         <button
           onClick={() => setCompare((v) => !v)}
           className={`text-xs px-2.5 py-1 rounded border transition ${
@@ -120,6 +147,9 @@ export default function RollDetails({
         ) : (
           <>
             {/* Swap between your own instances */}
+            {myInstances.length === 1 && (
+              <p className="text-gray-600 text-[10px]">You own 1 copy of this - nothing to swap.</p>
+            )}
             {myInstances.length > 1 && (
               <div>
                 <p className="text-gray-500 text-[10px] uppercase tracking-wide mb-1.5">

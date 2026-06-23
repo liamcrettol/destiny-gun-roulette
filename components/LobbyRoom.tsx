@@ -118,6 +118,8 @@ export default function LobbyRoom({
   // instance THIS player has chosen to equip for each slot.
   const [rollsData, setRollsData] = useState<RollsData>({});
   const [myChosenInstances, setMyChosenInstances] = useState<Partial<Record<WeaponSlot, string>>>({});
+  const [rollsLoading, setRollsLoading] = useState(false);
+  const [rollsError, setRollsError] = useState<string | null>(null);
   const [applyResults, setApplyResults] = useState<ApplyResult[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
@@ -184,6 +186,8 @@ export default function LobbyRoom({
     .map((s) => slots.find((x) => x.slot === s)?.item_hash ?? 0).join(",");
   const fetchRolls = useCallback(async () => {
     if (!roundId) return;
+    setRollsLoading(true);
+    setRollsError(null);
     try {
       const res = await fetch("/api/roulette/rolls", {
         method: "POST",
@@ -191,6 +195,7 @@ export default function LobbyRoom({
         body: JSON.stringify({ lobbyId: lobby.id, roundId }),
       });
       const data = await res.json();
+      if (!res.ok) { setRollsError(data.error ?? "Failed to load rolls"); setRollsLoading(false); return; }
       const next: RollsData = data.slots ?? {};
       setRollsData(next);
       // Default each slot to my best instance (prefer one already on a character),
@@ -205,9 +210,10 @@ export default function LobbyRoom({
         }
         return out;
       });
-    } catch {
-      // ignore - rolls panel just won't populate
+    } catch (e) {
+      setRollsError(e instanceof Error ? e.message : "Failed to load rolls");
     }
+    setRollsLoading(false);
   }, [lobby.id, roundId]);
 
   useEffect(() => {
@@ -961,8 +967,15 @@ export default function LobbyRoom({
             onCancelApply={handleCancelApply} selectedCharId={selectedCharId} loading={loadingAction === "apply"} />
         )}
 
-        {Object.keys(rollsData).length > 0 && (
-          <RollDetails rolls={rollsData} chosenInstances={myChosenInstances} onChooseInstance={handleChooseInstance} />
+        {slots.some((s) => s.item_hash !== 0) && (
+          <RollDetails
+            rolls={rollsData}
+            chosenInstances={myChosenInstances}
+            onChooseInstance={handleChooseInstance}
+            loading={rollsLoading}
+            error={rollsError}
+            onRetry={fetchRolls}
+          />
         )}
 
         {applyResults.length > 0 && <ApplyStatus results={applyResults} />}
