@@ -186,7 +186,11 @@ export default function RollDetails({
                   ))}
                 </div>
                 <StatBars stats={chosen.stats} base={slot.baseStats} />
-                <p className="text-gray-600 text-[10px] mt-1.5">Green/red = perk impact vs the weapon&apos;s base stats.</p>
+                <p className="text-gray-600 text-[10px] mt-1.5">
+                  {Object.keys(chosen.stats).length === 0
+                    ? "Live perk stats unavailable - showing base values."
+                    : "Green/red = perk impact vs the weapon's base stats."}
+                </p>
               </div>
             )}
           </>
