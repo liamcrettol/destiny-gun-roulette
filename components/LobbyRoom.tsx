@@ -64,7 +64,6 @@ export default function LobbyRoom({
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
   const [lockedSlots, setLockedSlots] = useState<Set<WeaponSlot>>(new Set());
   const [wildcardSlots, setWildcardSlots] = useState<Set<WeaponSlot>>(new Set());
-  // Post-match state
   const [postMatchStats, setPostMatchStats] = useState<PlayerStat[] | null>(null);
   const [polling, setPolling] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -76,7 +75,6 @@ export default function LobbyRoom({
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
 
-  // --- Polling logic ---
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
@@ -98,21 +96,19 @@ export default function LobbyRoom({
         setPostMatchStats(data.stats);
       }
     } catch {
-      // silently ignore poll errors
+      // ignore poll errors
     }
   }, [lobby.id, stopPolling]);
 
   const startPolling = useCallback(() => {
     if (pollTimerRef.current) return;
     setPolling(true);
-    // Run immediately, then on interval
     detectGameEnd();
     pollTimerRef.current = setInterval(detectGameEnd, POLL_INTERVAL_MS);
   }, [detectGameEnd]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
 
-  // If another client already found the game, pick it up via realtime on game_sessions
   useEffect(() => {
     const channel = supabase
       .channel(`lobby:${lobby.id}`)
@@ -138,7 +134,7 @@ export default function LobbyRoom({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "game_sessions", filter: `lobby_id=eq.${lobby.id}` },
         () => {
-          // Another client found the game — fetch stats if we don't have them yet
+          // Another client found the match; pick up stats if we haven't yet
           if (!postMatchStats) detectGameEnd();
         }
       )
@@ -238,7 +234,7 @@ export default function LobbyRoom({
       });
       const data = await res.json();
       if (!data.intersection) {
-        setIntersectionError(data.error ?? "Unknown error loading shared weapons");
+        setIntersectionError(data.error ?? "Failed to load shared weapons");
         setLoadingAction(null);
         return;
       }
@@ -319,7 +315,6 @@ export default function LobbyRoom({
       const data = await res.json();
       if (data.results) {
         setApplyResults(data.results);
-        // Loadout applied — start watching for the game to end
         startPolling();
       }
     } catch (e) {
@@ -388,7 +383,7 @@ export default function LobbyRoom({
     />
   ) : null;
 
-  // ── Post-match overlay ──────────────────────────────────────────────────────
+  // Post-match screen
   if (postMatchStats) {
     const sorted = [...postMatchStats].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills);
     return (
@@ -396,18 +391,18 @@ export default function LobbyRoom({
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Match Over</h1>
-            <p className="text-gray-400 text-sm">Round {lobbyData.current_round} results</p>
+            <p className="text-gray-400 text-sm">Round {lobbyData.current_round}</p>
           </div>
           <button
             onClick={handleLeave}
             className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-white hover:border-gray-500 transition"
           >
-            Leave Lobby
+            Leave
           </button>
         </div>
 
         <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6">
-          <h2 className="text-white font-semibold mb-4">Post-Match Summary</h2>
+          <h2 className="text-white font-semibold mb-4">Results</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -438,20 +433,20 @@ export default function LobbyRoom({
 
         {isCaptain && (
           <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
-            <p className="text-yellow-400 text-sm font-semibold mb-3">👑 Captain — ready for another round?</p>
+            <p className="text-yellow-400 text-sm font-semibold mb-3">👑 Go again?</p>
             <button
               onClick={handleNextRound}
               disabled={loadingAction === "next-round"}
               className="px-5 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
             >
-              {loadingAction === "next-round" ? "Starting…" : "▶ Next Round"}
+              {loadingAction === "next-round" ? "Starting..." : "Next Round"}
             </button>
-            <p className="text-xs text-gray-500 mt-2">Captain role will rotate to the next player.</p>
+            <p className="text-xs text-gray-500 mt-2">Captain passes to the next player.</p>
           </div>
         )}
 
         {!isCaptain && (
-          <p className="text-gray-500 text-sm text-center">Waiting for captain to start the next round…</p>
+          <p className="text-gray-500 text-sm text-center">Waiting for the captain...</p>
         )}
       </div>
     );
@@ -459,22 +454,20 @@ export default function LobbyRoom({
 
   return (
     <div className="flex gap-6 items-start">
-      {/* ── Left: main lobby content ── */}
       <div className="flex-1 min-w-0 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Lobby</h1>
             <p className="text-gray-400 text-sm">
-              Code:{" "}
-              <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
-              {" "}— share this with your fireteam
+              Code: <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
+              {" "}· share with your fireteam
             </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400">Round {lobbyData.current_round}</span>
             {polling && (
-              <span className="text-xs text-green-500 animate-pulse">● watching for match end</span>
+              <span className="text-xs text-green-500 animate-pulse">● watching</span>
             )}
             <button onClick={handleLeave} className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition">
               Leave
@@ -489,7 +482,7 @@ export default function LobbyRoom({
           <div className="flex flex-wrap gap-3">
             {members.map((m) => (
               <div key={m.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"}`}>
-                {m.is_captain && <span title="Captain">👑</span>}
+                {m.is_captain && <span>👑</span>}
                 <span className={m.is_ready ? "text-green-400" : "text-gray-300"}>{m.display_name}</span>
                 {m.is_ready && <span className="text-green-500 text-xs">✓</span>}
               </div>
@@ -511,7 +504,7 @@ export default function LobbyRoom({
             </div>
             <button onClick={handleReady} disabled={!selectedCharId || loadingAction === "ready"}
               className={`mt-3 px-4 py-2 rounded-lg text-sm font-semibold transition ${isReady ? "bg-green-700 text-white" : "bg-bungie-blue text-white hover:opacity-90"} disabled:opacity-50`}>
-              {loadingAction === "ready" ? "…" : isReady ? "✓ Ready" : "Mark Ready"}
+              {loadingAction === "ready" ? "..." : isReady ? "✓ Ready" : "Mark Ready"}
             </button>
           </div>
         )}
@@ -519,17 +512,17 @@ export default function LobbyRoom({
         {/* Captain controls */}
         {isCaptain && (
           <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
-            <h2 className="text-yellow-400 font-semibold mb-3">👑 Captain Controls</h2>
+            <h2 className="text-yellow-400 font-semibold mb-3">👑 Captain</h2>
             <div className="flex flex-wrap gap-3">
               <button onClick={handleLoadIntersection} disabled={loadingAction !== null}
                 className="px-4 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-sm text-white hover:border-gray-400 disabled:opacity-50 transition">
-                {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
+                {loadingAction === "intersection" ? "Loading..." : "Load Shared Weapons"}
               </button>
               {intersection && (
                 <>
                   <button onClick={() => handleRoll()} disabled={loadingAction !== null}
                     className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition">
-                    {loadingAction === "roll" ? "Rolling…" : "🎲 Roll All"}
+                    {loadingAction === "roll" ? "Rolling..." : "🎲 Roll All"}
                   </button>
                   {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => (
                     <button key={slot} onClick={() => handleRoll(slot)} disabled={loadingAction !== null}
@@ -551,12 +544,12 @@ export default function LobbyRoom({
                   return (
                     <span key={slot} className="flex items-center gap-1">
                       <button onClick={() => toggleLock(slot)} disabled={!hasRoll}
-                        title={`Lock ${SLOT_LABELS[slot]} to current rolled weapon`}
+                        title={`Lock ${SLOT_LABELS[slot]} to this weapon`}
                         className={`px-2 py-1 rounded text-xs border transition ${locked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"} disabled:opacity-30`}>
                         {locked ? "🔒" : "🔓"}
                       </button>
                       <button onClick={() => toggleWildcard(slot)}
-                        title={`? — everyone keeps their own ${SLOT_LABELS[slot].toLowerCase()} weapon`}
+                        title={`Wildcard: everyone uses their own ${SLOT_LABELS[slot].toLowerCase()} weapon`}
                         className={`px-2 py-1 rounded text-xs border transition ${wildcard ? "border-purple-500 bg-purple-500/20 text-purple-300" : "border-bungie-border text-gray-400 hover:border-gray-400"}`}>
                         ❓
                       </button>
@@ -567,29 +560,25 @@ export default function LobbyRoom({
               </div>
             )}
 
-            {intersectionError && <div className="mt-2 text-xs text-red-400 break-all">Error: {intersectionError}</div>}
+            {intersectionError && <div className="mt-2 text-xs text-red-400 break-all">{intersectionError}</div>}
             {intersection && (
               <div className="mt-2 text-xs text-gray-400">
-                Shared pool — Kinetic: {intersection.kinetic.length} · Energy: {intersection.energy.length} · Power: {intersection.power.length}
+                Kinetic: {intersection.kinetic.length} · Energy: {intersection.energy.length} · Power: {intersection.power.length}
               </div>
             )}
           </div>
         )}
 
-        {/* Loadout queue */}
         {slots.length > 0 && (
           <LoadoutQueue slots={slots} weaponDetails={weaponDetails} onApply={handleApply}
             onCancelApply={handleCancelApply} selectedCharId={selectedCharId} loading={loadingAction === "apply"} />
         )}
 
-        {/* Apply results */}
         {applyResults.length > 0 && <ApplyStatus results={applyResults} />}
 
-        {/* Weapon browser — mobile fallback */}
         {weaponBrowser && <div className="xl:hidden">{weaponBrowser}</div>}
       </div>
 
-      {/* ── Right: sticky weapon browser sidebar ── */}
       {weaponBrowser && (
         <div className="hidden xl:block w-[420px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
           {weaponBrowser}
