@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    // Require loadout to have been applied before we start looking
     if (!recentHistory?.applied_at) return NextResponse.json({ done: false });
 
     // Get all members with character IDs
@@ -45,6 +44,19 @@ export async function POST(req: NextRequest) {
       .eq("lobby_id", lobbyId);
 
     if (!members?.length) return NextResponse.json({ done: false });
+
+    const memberInputs = members
+      .filter((m) => m.selected_character_id)
+      .map((m) => ({
+        userId: m.user_id,
+        displayName: m.display_name,
+        membershipType: m.bungie_membership_type,
+        membershipId: m.bungie_membership_id,
+        characterId: m.selected_character_id!,
+      }));
+
+    // Require at least 2 players to log stats
+    if (memberInputs.length < 2) return NextResponse.json({ done: false });
 
     // Get all roulette hashes for this lobby
     const { data: roundRows } = await adminSupabase
@@ -67,16 +79,6 @@ export async function POST(req: NextRequest) {
     if (!callerMember?.selected_character_id) return NextResponse.json({ done: false });
 
     const token = await getBungieToken(session.userId);
-
-    const memberInputs = members
-      .filter((m) => m.selected_character_id)
-      .map((m) => ({
-        userId: m.user_id,
-        displayName: m.display_name,
-        membershipType: m.bungie_membership_type,
-        membershipId: m.bungie_membership_id,
-        characterId: m.selected_character_id!,
-      }));
 
     const stats = await collectPostMatchStats(memberInputs, rouletteHashes, token);
     if (!stats) return NextResponse.json({ done: false });
