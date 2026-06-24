@@ -16,7 +16,7 @@ export interface RawWeapon {
   characterId?: string;
   isEquipped: boolean;
   lightLevel: number;
-  tierType: number;
+  tierType?: number; // 6=Exotic, 5=Legendary
 }
 
 const PROFILE_COMPONENTS = [200, 201, 205, 102, 300].join(",");
