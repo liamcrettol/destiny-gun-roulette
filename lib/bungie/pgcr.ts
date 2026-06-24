@@ -134,15 +134,13 @@ export async function collectPostMatchStats(
     );
     if (![...membershipIdSet].every((id) => pgcrMemberIds.has(id))) continue;
 
-    // At least one FIRETEAM MEMBER must have a kill with a roulette weapon
-    // (ignore opponents who happen to use the same gun, so we don't match the
-    // wrong game).
-    const anyRouletteKill = pgcr.entries.some(
+    // PvE activities have no standing (win/loss) field — skip them
+    const isPvP = pgcr.entries.some(
       (e) =>
         membershipIdSet.has(e.player.destinyUserInfo.membershipId) &&
-        e.extended?.weapons?.some((w) => hashSet.has(w.referenceId))
+        e.values.standing?.basic?.value != null
     );
-    if (!anyRouletteKill) continue;
+    if (!isPvP) continue;
 
     // Match found - extract per-player stats
     const playerStats = members.map((member) => {

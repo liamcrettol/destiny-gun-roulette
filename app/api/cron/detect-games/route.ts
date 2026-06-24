@@ -187,7 +187,16 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      await rotateCaptain(lobbyId);
+      // Only rotate if the apply route didn't already do it for this round
+      const { data: roundState } = await adminSupabase
+        .from("lobby_rounds")
+        .select("captain_rotated")
+        .eq("id", roundId)
+        .single();
+
+      if (!roundState?.captain_rotated) {
+        await rotateCaptain(lobbyId);
+      }
 
       const { data: currentLobby } = await adminSupabase
         .from("lobbies")

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { collectPostMatchStats } from "@/lib/bungie/pgcr";
+import { rotateCaptain } from "@/lib/lobby";
 import { z } from "zod";
 
 const BUNGIE_ROOT = "https://www.bungie.net/Platform";
@@ -170,12 +171,26 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Advance to next round - captain rotation now happens at apply time
-      const { data: lobby } = await adminSupabase
+      // Fallback rotation: if the apply route didn't rotate (not everyone applied
+      // before the game ended and the round advanced), rotate here instead.
+      const { data: roundState } = await adminSupabase
+        .from("lobby_rounds")
+        .select("captain_rotated")
+        .eq("id", recentHistory.round_id)
+        .single();
+
+      const { data: lobbyMeta } = await adminSupabase
         .from("lobbies")
-        .select("current_round")
+        .select("current_round, captain_locked")
         .eq("id", lobbyId)
         .single();
+
+      if (!roundState?.captain_rotated && !lobbyMeta?.captain_locked) {
+        await rotateCaptain(lobbyId);
+      }
+
+      // Advance to next round
+      const lobby = lobbyMeta;
 
       if (lobby) {
         const nextRound = lobby.current_round + 1;
