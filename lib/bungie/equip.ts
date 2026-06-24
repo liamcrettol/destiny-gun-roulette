@@ -13,6 +13,21 @@ export function isInventoryFull(characterId: string, roster: RawWeapon[]): boole
   return characterWeapons.length >= INVENTORY_SLOT_LIMIT;
 }
 
+export function findLowestLightWeapon(
+  characterId: string,
+  roster: RawWeapon[],
+  excludeInstanceIds: Set<string> = new Set()
+): RawWeapon | null {
+  const candidates = roster.filter(
+    (w) =>
+      w.location === "character" &&
+      w.characterId === characterId &&
+      !w.isEquipped &&
+      !excludeInstanceIds.has(w.itemInstanceId)
+  );
+  return candidates.sort((a, b) => a.lightLevel - b.lightLevel)[0] ?? null;
+}
+
 const EXOTIC_TIER_TYPE = 6;
 const LEGENDARY_TIER_TYPE = 5;
 
