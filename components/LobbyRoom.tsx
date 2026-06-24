@@ -1213,10 +1213,10 @@ export default function LobbyRoom({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleToggleCaptainLock}
-                  title={captainLocked ? "Click to auto-rotate captain each round" : "Click to stay captain every round"}
-                  className={`text-xs px-2.5 py-1 rounded border transition ${captainLocked ? "border-bungie-border text-gray-400 hover:border-gray-400" : "border-yellow-500 bg-yellow-500/20 text-yellow-300"}`}
+                  title={captainLocked ? "You stay captain every round — click to auto-rotate instead" : "Captain rotates each round — click to lock yourself in as captain"}
+                  className={`text-xs px-2.5 py-1 rounded border transition ${captainLocked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"}`}
                 >
-                  {captainLocked ? "🔁 Auto-rotate" : "🔒 Stay Captain"}
+                  {captainLocked ? "🔒 Stay Captain" : "🔁 Auto-rotate"}
                 </button>
                 <button
                   onClick={() => setShowWeaponBrowser((v) => !v)}
