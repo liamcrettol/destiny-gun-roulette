@@ -483,6 +483,8 @@ export default function LobbyRoom({
   }, [roundId]);
 
   const isCaptain = members.find((m) => m.user_id === currentUserId)?.is_captain ?? false;
+  const captainMember = members.find((m) => m.is_captain);
+  const captainName = captainMember ? trimBungieName(captainMember.display_name) : null;
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -1104,7 +1106,10 @@ export default function LobbyRoom({
 
         {/* Members */}
         <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-          <h2 className="text-white font-semibold mb-3">Fireteam ({members.length})</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-white font-semibold">Fireteam ({members.length})</h2>
+            {captainName && <span className="text-xs text-yellow-400">👑 {captainName}&apos;s turn</span>}
+          </div>
           <div className="flex flex-wrap gap-3">
             {members.map((m) => (
               <div key={m.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"}`}>
@@ -1148,14 +1153,14 @@ export default function LobbyRoom({
         {isCaptain && (
           <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-yellow-400 font-semibold">👑 Captain</h2>
+              <h2 className="text-yellow-400 font-semibold">👑 {captainName ? `${captainName}'s Turn` : "Your Turn"}</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleToggleCaptainLock}
-                  title={captainLocked ? "Stay captain after each match (click to disable rotation)" : "Rotate captain after each match (click to stay captain)"}
-                  className={`text-xs px-2.5 py-1 rounded border transition ${captainLocked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"}`}
+                  title={captainLocked ? "Click to auto-rotate captain each round" : "Click to stay captain every round"}
+                  className={`text-xs px-2.5 py-1 rounded border transition ${captainLocked ? "border-bungie-border text-gray-400 hover:border-gray-400" : "border-yellow-500 bg-yellow-500/20 text-yellow-300"}`}
                 >
-                  {captainLocked ? "🔒 Stay Captain" : "🔁 Auto-rotate"}
+                  {captainLocked ? "🔁 Auto-rotate" : "🔒 Stay Captain"}
                 </button>
                 <button
                   onClick={() => setShowWeaponBrowser((v) => !v)}
