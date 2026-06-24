@@ -2,7 +2,6 @@ import { adminSupabase } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import weaponsTable from "@/lib/bungie/data/weapons-table.json";
-import Image from "next/image";
 import WeaponIcon from "@/components/WeaponIcon";
 
 export const dynamic = "force-dynamic";
@@ -109,6 +108,7 @@ export default async function PlayerStatsPage({ params }: { params: Promise<{ us
                   watermark={e.def.watermark}
                   name={e.def.name}
                   size="medium"
+                  count={e.count}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{e.def.name}</p>
