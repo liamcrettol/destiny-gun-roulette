@@ -769,8 +769,13 @@ export default function LobbyRoom({
 
   // Write a roll for an explicit wildcard set (avoids stale wildcardSlots state).
   // Keeps every slot's current real weapon except wildcards, the sentinel 0, and
-  // an optional slot being rerolled.
-  const rollWithModes = useCallback(async (nextWildcards: Set<WeaponSlot>, rerollSlot?: WeaponSlot) => {
+  // an optional slot being rerolled. extraKeep injects additional slot→hash pairs
+  // (used to restore a previous roll when leaving wildcard mode).
+  const rollWithModes = useCallback(async (
+    nextWildcards: Set<WeaponSlot>,
+    rerollSlot?: WeaponSlot,
+    extraKeep?: Partial<Record<WeaponSlot, number>>
+  ) => {
     if (!intersection || !roundId) return;
     for (const s of ["kinetic", "energy", "power"]) animKindRef.current[s] = "roll";
     setLoadingAction("roll");
@@ -781,6 +786,11 @@ export default function LobbyRoom({
       if (sl === rerollSlot) continue;
       if (s.item_hash === 0) continue;
       keep[sl] = s.item_hash;
+    }
+    if (extraKeep) {
+      for (const [sl, hash] of Object.entries(extraKeep) as [WeaponSlot, number][]) {
+        if (hash && !keep[sl]) keep[sl] = hash;
+      }
     }
     const avoid = { ...recentRollsRef.current };
     await fetch("/api/roulette/roll", {
@@ -814,10 +824,15 @@ export default function LobbyRoom({
       setWildcardSlots(next);
       rollWithModes(next);
     } else {
-      // Your own -> Random (reroll this slot back to a real weapon)
+      // Your own -> Random (restore the previous roll for this slot if we have one)
       const next = new Set(wildcardSlots); next.delete(slot);
       setWildcardSlots(next);
-      rollWithModes(next, slot);
+      const previousHash = recentRollsRef.current[slot][0];
+      if (previousHash) {
+        rollWithModes(next, undefined, { [slot]: previousHash });
+      } else {
+        rollWithModes(next, slot);
+      }
     }
   }, [lockedSlots, wildcardSlots, rollWithModes]);
 
