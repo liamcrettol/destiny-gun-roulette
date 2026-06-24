@@ -185,6 +185,8 @@ export async function POST(req: NextRequest) {
       getPerkIcons([...allPerkHashes]),
       getWeaponDefinitions([...loadoutHashes]),
     ]);
+    const nameOf = (h: number) => perkInfoMap.get(h)?.name ?? "Unknown";
+    const iconOf = (h: number) => perkIconMap.get(h) ?? "";
 
     // Build the response: per slot -> { itemHash, damageType, baseStats, members: [...] }
     const slots: Record<string, { itemHash: number; damageType: string; baseStats: Record<string, number>; members: MemberRolls[] }> = {};
@@ -203,6 +205,12 @@ export async function POST(req: NextRequest) {
             perkHashes,
             perks: perkHashes.map((h) => perkInfoMap.get(h) as Perk),
             perkIcons,
+            barrelName: inst.barrelHash ? nameOf(inst.barrelHash) : undefined,
+            barrelIcon: inst.barrelHash ? iconOf(inst.barrelHash) : undefined,
+            magazineName: inst.magazineHash ? nameOf(inst.magazineHash) : undefined,
+            magazineIcon: inst.magazineHash ? iconOf(inst.magazineHash) : undefined,
+            masterworkName: inst.masterworkHash ? nameOf(inst.masterworkHash) : undefined,
+            masterworkIcon: inst.masterworkHash ? iconOf(inst.masterworkHash) : undefined,
           };
         });
         memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances, failed: m.failed });
