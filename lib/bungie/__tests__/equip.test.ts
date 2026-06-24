@@ -1,5 +1,8 @@
-import { isInventoryFull, findLastWeapon } from "../equip";
+import { isInventoryFull, findLastWeapon, ensureInventorySpace } from "../equip";
 import type { RawWeapon } from "../rawInventory";
+import * as clientModule from "../client";
+
+jest.mock("../client");
 
 describe("isInventoryFull", () => {
   const mockWeapons = (count: number, location: "character" = "character"): RawWeapon[] => {
@@ -111,5 +114,94 @@ describe("findLastWeapon", () => {
     );
     // Should return instance-1, not the excluded instance-2
     expect(result?.itemInstanceId).toBe("instance-1");
+  });
+});
+
+describe("ensureInventorySpace", () => {
+  const mockWeapons = (characterId: string, count: number = 5): RawWeapon[] => {
+    return Array.from({ length: count }, (_, i) => ({
+      itemHash: 1000 + i,
+      itemInstanceId: `instance-${i}`,
+      slot: (["kinetic", "energy", "power"][i % 3]) as any,
+      location: "character" as const,
+      characterId,
+      isEquipped: false,
+      lightLevel: 750 - i * 10,
+      tierType: 5,
+    }));
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (clientModule.bungiePost as jest.Mock).mockResolvedValue({});
+  });
+
+  it("returns empty array when inventory is not full", async () => {
+    const weapons = mockWeapons("char-1", 5);
+    const result = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    expect(result).toEqual([]);
+  });
+
+  it("vaults weapon when inventory is full even without loadout exclusions", async () => {
+    const weapons = mockWeapons("char-1", 9);
+    const result = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    expect(result).toHaveLength(1);
+    expect(result[0].itemInstanceId).toBe("instance-8");
+  });
+
+  it("returns empty array when no unequipped weapons available to vault", async () => {
+    const weapons = mockWeapons("char-1", 9);
+    weapons.forEach(w => w.isEquipped = true);
+    const result = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    expect(result).toEqual([]);
+  });
+
+  it("vaults the lowest-light unequipped weapon when inventory is full", async () => {
+    const weapons = mockWeapons("char-1", 9);
+    const clearResult = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    expect(clearResult).toHaveLength(1);
+    expect(clearResult[0].itemInstanceId).toBe("instance-8"); // lowest light
+    expect(clearResult[0].transferredToVault).toBe(true);
+  });
+
+  it("excludes loadout item instance IDs from being vaulted", async () => {
+    const weapons = mockWeapons("char-1", 9);
+    const loadoutIds = new Set(["instance-8", "instance-7"]);
+    const clearResult = await ensureInventorySpace("char-1", weapons, "token", 2, 12345, loadoutIds);
+    expect(clearResult).toHaveLength(1);
+    expect(clearResult[0].itemInstanceId).toBe("instance-6"); // next lowest light
+    expect(clearResult[0].transferredToVault).toBe(true);
+  });
+
+  it("ignores vault and other character weapons when finding weapon to vault", async () => {
+    const charWeapons = mockWeapons("char-1", 9);
+    const vaultWeapons = mockWeapons("vault", 5);
+    vaultWeapons.forEach(w => w.location = "vault");
+    const otherCharWeapons = mockWeapons("char-2", 5);
+
+    const allWeapons = [...charWeapons, ...vaultWeapons, ...otherCharWeapons];
+    const clearResult = await ensureInventorySpace("char-1", allWeapons, "token", 2, 12345);
+
+    expect(clearResult).toHaveLength(1);
+    expect(clearResult[0].itemInstanceId).toBe("instance-8"); // lowest light on char-1
+    expect(clearResult[0].transferredToVault).toBe(true);
+  });
+
+  it("uses correct Bungie API parameters for transfer request", async () => {
+    const weapons = mockWeapons("char-1", 9);
+    const membershipType = 2;
+    await ensureInventorySpace("char-1", weapons, "token", membershipType, 12345);
+
+    expect(clientModule.bungiePost).toHaveBeenCalledWith(
+      "/Destiny2/Actions/Items/TransferItem/",
+      "token",
+      expect.objectContaining({
+        transferToVault: true,
+        characterId: "char-1",
+        membershipType,
+        itemReferenceHash: 1008, // instance-8 item hash
+        itemId: "instance-8",
+      })
+    );
   });
 });

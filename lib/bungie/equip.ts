@@ -88,6 +88,65 @@ function isNoRoomError(err: unknown): boolean {
   return msg.includes("1642") || msg.includes("no room") || msg.includes("destinationfull");
 }
 
+export async function ensureInventorySpace(
+  characterId: string,
+  roster: RawWeapon[],
+  accessToken: string,
+  membershipType: number,
+  userId: string,
+  loadoutInstanceIds: Set<string> = new Set()
+): Promise<InventoryClearResult[]> {
+  const results: InventoryClearResult[] = [];
+
+  // Check if inventory is full
+  if (!isInventoryFull(characterId, roster)) {
+    return results;
+  }
+
+  // Find the lowest-light unequipped weapon on the character to vault
+  const candidates = roster.filter(
+    (w) =>
+      w.location === "character" &&
+      w.characterId === characterId &&
+      !w.isEquipped &&
+      !loadoutInstanceIds.has(w.itemInstanceId)
+  );
+
+  // Sort by light level ascending to find the lowest-light weapon
+  const weaponToVault = candidates.sort((a, b) => a.lightLevel - b.lightLevel)[0] ?? null;
+
+  if (!weaponToVault) {
+    return results;
+  }
+
+  // Attempt to vault the weapon
+  try {
+    await bungiePost<unknown>(
+      "/Destiny2/Actions/Items/TransferItem/",
+      accessToken,
+      {
+        itemReferenceHash: weaponToVault.itemHash,
+        stackSize: 1,
+        transferToVault: true,
+        itemId: weaponToVault.itemInstanceId,
+        characterId,
+        membershipType,
+      } satisfies TransferItemRequest
+    );
+
+    results.push({
+      itemInstanceId: weaponToVault.itemInstanceId,
+      itemHash: weaponToVault.itemHash,
+      transferredToVault: true,
+    });
+  } catch {
+    // If vault transfer fails, return empty array per requirements
+    return [];
+  }
+
+  return results;
+}
+
 interface TransferItemRequest {
   itemReferenceHash: number;
   stackSize: number;
@@ -95,6 +154,12 @@ interface TransferItemRequest {
   itemId: string;
   characterId: string;
   membershipType: number;
+}
+
+export interface InventoryClearResult {
+  itemInstanceId: string;
+  itemHash: number;
+  transferredToVault: boolean;
 }
 
 interface EquipItemsRequest {
