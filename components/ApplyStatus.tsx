@@ -9,10 +9,21 @@ const SLOT_LABELS: Record<string, string> = {
   power: "Power",
 };
 
-export default function ApplyStatus({ results }: { results: ApplyResult[] }) {
+export default function ApplyStatus({ results, onDismiss }: { results: ApplyResult[]; onDismiss?: () => void }) {
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-      <h2 className="text-white font-semibold mb-3">Loadout</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-white font-semibold">Loadout</h2>
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            aria-label="Dismiss"
+            className="shrink-0 text-gray-500 hover:text-gray-300 text-sm leading-none"
+          >
+            ✕
+          </button>
+        )}
+      </div>
       <div className="space-y-2">
         {results.map((r, i) => (
           <div
