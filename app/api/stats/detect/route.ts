@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
-import { collectPostMatchStats } from "@/lib/bungie/pgcr";
+import { collectPostMatchStats, resolveActivityName } from "@/lib/bungie/pgcr";
 import { rotateCaptain } from "@/lib/lobby";
 import { z } from "zod";
 
-const BUNGIE_ROOT = "https://www.bungie.net/Platform";
-
 const schema = z.object({ lobbyId: z.string().uuid() });
-
-async function resolveActivityName(hash: number): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `${BUNGIE_ROOT}/Destiny2/Manifest/DestinyActivityDefinition/${hash}/`,
-      { headers: { "X-API-Key": process.env.BUNGIE_API_KEY! } }
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    return (json.Response?.displayProperties?.name as string) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -133,6 +117,9 @@ export async function POST(req: NextRequest) {
     const mapName = await resolveActivityName(activityHash);
 
     // ── Step 8: Persist the game session ────────────────────────────────────
+    // The unique index on game_sessions(round_id) is the real race guard: if a
+    // concurrent poller already inserted this round, the insert fails and we
+    // return the stats we computed without double-recording.
     const { data: gameSession } = await adminSupabase
       .from("game_sessions")
       .insert({

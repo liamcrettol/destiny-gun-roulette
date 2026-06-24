@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { getBungieToken } from "@/lib/auth/helpers";
-import { collectPostMatchStats } from "@/lib/bungie/pgcr";
+import { collectPostMatchStats, resolveActivityName } from "@/lib/bungie/pgcr";
 import { rotateCaptain } from "@/lib/lobby";
 
 // Vercel Cron calls this every 5 minutes with Authorization: Bearer CRON_SECRET.
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
       const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, tokenOwnerUserId, appliedAt);
       if (!result) continue;
 
-      const { playerStats, weaponKills } = result;
+      const { playerStats, weaponKills, activityHash } = result;
 
       // Race check
       const { data: raceCheck } = await adminSupabase
@@ -155,9 +155,21 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
+      const mapName = await resolveActivityName(activityHash);
+
+      // Mirror the detect route's columns so cron-recorded games still show
+      // their map name and weapons in history. The unique index on round_id
+      // guards against a duplicate if the detect route raced us.
       const { data: gameSession } = await adminSupabase
         .from("game_sessions")
-        .insert({ lobby_id: lobbyId, player_count: playerStats.length, roulette_hashes: rouletteHashes })
+        .insert({
+          lobby_id: lobbyId,
+          player_count: playerStats.length,
+          roulette_hashes: rouletteHashes,
+          round_id: roundId,
+          map_name: mapName,
+          activity_hash: activityHash,
+        })
         .select()
         .single();
 

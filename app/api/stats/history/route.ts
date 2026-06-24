@@ -20,11 +20,14 @@ export async function GET(req: NextRequest) {
   const sessionIds = sessions.map((s) => s.id);
   const roundIds = sessions.map((s) => s.round_id).filter(Boolean) as string[];
 
-  const [{ data: allStats }, { data: weaponKills }, { data: loadoutSlots }] = await Promise.all([
+  const [{ data: allStats }, { data: weaponKills }, { data: loadoutSlots }, { data: roundRows }] = await Promise.all([
     adminSupabase.from("player_game_stats").select("*").in("game_session_id", sessionIds),
     adminSupabase.from("weapon_round_kills").select("game_session_id, item_hash, total_kills").in("game_session_id", sessionIds),
     roundIds.length > 0
       ? adminSupabase.from("lobby_loadout_slots").select("round_id, slot, item_hash, weapon_name, weapon_icon").in("round_id", roundIds)
+      : Promise.resolve({ data: [] }),
+    roundIds.length > 0
+      ? adminSupabase.from("lobby_rounds").select("id, round_number").in("id", roundIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -35,6 +38,11 @@ export async function GET(req: NextRequest) {
     list.push(s);
     slotsByRound.set(s.round_id, list);
   }
+
+  // Real round numbers keyed by round_id (positional index drifts if a round
+  // produced no session).
+  const roundNumById = new Map<string, number>();
+  for (const r of roundRows ?? []) roundNumById.set(r.id, r.round_number);
 
   const rounds = sessions.map((session, i) => {
     const killsByHash = new Map<number, number>();
@@ -53,7 +61,7 @@ export async function GET(req: NextRequest) {
     return {
       sessionId: session.id,
       playedAt: session.played_at,
-      roundNum: i + 1,
+      roundNum: (session.round_id ? roundNumById.get(session.round_id) : undefined) ?? i + 1,
       mapName: (session.map_name as string | null) ?? null,
       weapons: Object.keys(weaponsRolled).length > 0 ? weaponsRolled : undefined,
       stats: (allStats ?? [])

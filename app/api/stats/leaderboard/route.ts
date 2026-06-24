@@ -2,11 +2,22 @@ import { NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/supabase/admin";
 
 export async function GET() {
-  const { data } = await adminSupabase
-    .from("player_game_stats")
-    .select("user_id, display_name, kills, kd, won");
+  // Supabase caps a single select at 1000 rows; page through so the global
+  // leaderboard reflects every recorded game, not just the most recent 1000.
+  const PAGE = 1000;
+  const data: Array<{ user_id: string; display_name: string; kills: number; kd: number; won: boolean | null }> = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data: page } = await adminSupabase
+      .from("player_game_stats")
+      .select("user_id, display_name, kills, kd, won")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (!page?.length) break;
+    data.push(...page);
+    if (page.length < PAGE) break;
+  }
 
-  if (!data?.length) return NextResponse.json({ entries: [] });
+  if (!data.length) return NextResponse.json({ entries: [] });
 
   const byUser = new Map<string, {
     userId: string;

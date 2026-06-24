@@ -51,6 +51,20 @@ async function getActivityHistory(
   return json.Response?.activities ?? [];
 }
 
+export async function resolveActivityName(hash: number): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${BUNGIE_ROOT}/Destiny2/Manifest/DestinyActivityDefinition/${hash}/`,
+      { headers: { "X-API-Key": process.env.BUNGIE_API_KEY! } }
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return (json.Response?.displayProperties?.name as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function getPGCR(instanceId: string): Promise<PGCR | null> {
   const res = await fetch(
     `${BUNGIE_ROOT}/Destiny2/Stats/PostGameCarnageReport/${instanceId}/`,
