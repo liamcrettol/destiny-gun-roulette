@@ -199,6 +199,27 @@ export async function applyWeapons(
   const uniqueHashes = new Set(weapons.map((w) => w.itemHash));
   const weaponDefs = await getWeaponDefinitions(Array.from(uniqueHashes));
 
+  const makeResult = (
+    slot: WeaponSlot,
+    itemHash: number,
+    success: boolean,
+    error?: string,
+    errorDetail?: string
+  ): ApplyResult => {
+    const def = weaponDefs.get(itemHash);
+    return {
+      user_id: userId,
+      display_name: displayName,
+      slot,
+      item_hash: itemHash,
+      success,
+      error,
+      error_detail: errorDetail,
+      weapon_name: def?.name,
+      weapon_icon: def?.icon,
+    };
+  };
+
   const weaponsWithTierType = weapons.map((w) => ({
     ...w,
     tierType: weaponDefs.get(w.itemHash)?.tierType ?? LEGENDARY_TIER_TYPE,
@@ -311,28 +332,29 @@ export async function applyWeapons(
             tierType: loadoutWeaponForSlot.tierType,
           };
         } catch (err) {
-          results.push({
-            user_id: userId,
-            display_name: displayName,
-            slot: conflictSlot,
-            item_hash: conflictingExotic.itemHash,
-            success: false,
-            error: err instanceof Error ? err.message : "Failed to transfer weapon to clear exotic conflict",
-          });
+          results.push(
+            makeResult(
+              conflictSlot,
+              conflictingExotic.itemHash,
+              false,
+              err instanceof Error ? err.message : "Failed to transfer weapon to clear exotic conflict",
+              err instanceof Error ? err.message : undefined
+            )
+          );
           continue;
         }
       }
     }
 
     if (!replacement) {
-      results.push({
-        user_id: userId,
-        display_name: displayName,
-        slot: conflictSlot,
-        item_hash: conflictingExotic.itemHash,
-        success: false,
-        error: `Cannot swap out exotic in ${conflictSlot} slot — no legendary available`,
-      });
+      results.push(
+        makeResult(
+          conflictSlot,
+          conflictingExotic.itemHash,
+          false,
+          `Cannot swap out exotic in ${conflictSlot} slot — no legendary available`
+        )
+      );
       continue;
     }
 
@@ -347,14 +369,15 @@ export async function applyWeapons(
         } satisfies EquipItemsRequest
       );
     } catch (err) {
-      results.push({
-        user_id: userId,
-        display_name: displayName,
-        slot: conflictSlot,
-        item_hash: conflictingExotic.itemHash,
-        success: false,
-        error: err instanceof Error ? err.message : "Failed to swap out conflicting exotic",
-      });
+      results.push(
+        makeResult(
+          conflictSlot,
+          conflictingExotic.itemHash,
+          false,
+          err instanceof Error ? err.message : "Failed to swap out conflicting exotic",
+          err instanceof Error ? err.message : undefined
+        )
+      );
     }
   }
 
@@ -379,17 +402,11 @@ export async function applyWeapons(
           err = retryErr;
         }
       }
+      const raw = err instanceof Error ? err.message : "Transfer failed";
       const friendly = isNoRoomError(err)
         ? "Inventory full and no spare weapon to move — clear a slot, then Apply again"
-        : err instanceof Error ? err.message : "Transfer failed";
-      results.push({
-        user_id: userId,
-        display_name: displayName,
-        slot: weapon.slot,
-        item_hash: weapon.itemHash,
-        success: false,
-        error: friendly,
-      });
+        : raw;
+      results.push(makeResult(weapon.slot, weapon.itemHash, false, friendly, raw));
     }
   }
 
@@ -416,29 +433,27 @@ export async function applyWeapons(
       const equipResult = equipRes.equipResults.find(
         (r) => r.itemInstanceId === weapon.itemInstanceId
       );
-      results.push({
-        user_id: userId,
-        display_name: displayName,
-        slot: weapon.slot,
-        item_hash: weapon.itemHash,
-        success: equipResult?.equipStatus === 1,
-        error:
-          equipResult?.equipStatus !== 1
-            ? `Equip status: ${equipResult?.equipStatus}`
-            : undefined,
-      });
+      results.push(
+        makeResult(
+          weapon.slot,
+          weapon.itemHash,
+          equipResult?.equipStatus === 1,
+          equipResult?.equipStatus !== 1 ? `Equip status: ${equipResult?.equipStatus}` : undefined
+        )
+      );
     }
   } catch (err) {
     for (const weapon of weaponsWithTierType) {
       if (results.find((r) => r.slot === weapon.slot)) continue;
-      results.push({
-        user_id: userId,
-        display_name: displayName,
-        slot: weapon.slot,
-        item_hash: weapon.itemHash,
-        success: false,
-        error: err instanceof Error ? err.message : "Equip failed",
-      });
+      results.push(
+        makeResult(
+          weapon.slot,
+          weapon.itemHash,
+          false,
+          err instanceof Error ? err.message : "Equip failed",
+          err instanceof Error ? err.message : undefined
+        )
+      );
     }
   }
 
