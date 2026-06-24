@@ -3,6 +3,69 @@ import type { WeaponSlot } from "@/types/bungie";
 import type { ApplyResult } from "@/types/lobby";
 import type { RawWeapon } from "./rawInventory";
 
+// Constants
+const EXOTIC_TIER_TYPE = 6;
+const LEGENDARY_TIER_TYPE = 5;
+
+// Helper function to determine if a weapon is exotic
+function isExotic(tierType: number): boolean {
+  return tierType === EXOTIC_TIER_TYPE;
+}
+
+// Find any exotics already equipped in different slots than the new weapons
+function findConflictingExotics(
+  newWeapons: WeaponToApply[],
+  roster: RawWeapon[]
+): Map<WeaponSlot, RawWeapon> {
+  const conflictingExotics = new Map<WeaponSlot, RawWeapon>();
+
+  for (const newWeapon of newWeapons) {
+    // Look up the new weapon in the roster to get its tierType
+    const newWeaponData = roster.find(
+      (w) => w.itemInstanceId === newWeapon.itemInstanceId
+    );
+
+    // Skip non-exotics - no conflict possible
+    if (!newWeaponData?.tierType || !isExotic(newWeaponData.tierType)) continue;
+
+    // Find equipped exotics in different slots
+    for (const existingWeapon of roster) {
+      if (
+        existingWeapon.isEquipped &&
+        existingWeapon.tierType &&
+        isExotic(existingWeapon.tierType) &&
+        existingWeapon.slot !== newWeapon.slot &&
+        existingWeapon.location === "character"
+      ) {
+        conflictingExotics.set(existingWeapon.slot, existingWeapon);
+      }
+    }
+  }
+
+  return conflictingExotics;
+}
+
+// Find a legendary weapon in the given slot to swap in as replacement
+function findLegendaryReplacement(
+  slot: WeaponSlot,
+  characterId: string,
+  roster: RawWeapon[],
+  excludeInstanceIds: Set<string>
+): RawWeapon | null {
+  return (
+    roster.find(
+      (w) =>
+        w.slot === slot &&
+        w.location === "character" &&
+        w.characterId === characterId &&
+        w.tierType !== undefined &&
+        !isExotic(w.tierType) && // must be legendary or lower
+        !w.isEquipped &&
+        !excludeInstanceIds.has(w.itemInstanceId)
+    ) ?? null
+  );
+}
+
 // A transfer fails with this Bungie error code when the destination bucket is
 // full (no room on the character for another weapon of that slot).
 function isNoRoomError(err: unknown): boolean {
