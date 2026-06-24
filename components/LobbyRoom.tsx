@@ -632,17 +632,6 @@ export default function LobbyRoom({
       .then((d) => { if (d.characters) setCharacters(d.characters); });
   }, []);
 
-  // Auto-select the most recently played character once characters load,
-  // but only if the player hasn't already picked one (e.g. from a previous join).
-  useEffect(() => {
-    if (hasAutoSelected.current || !characters.length || selectedCharId) return;
-    hasAutoSelected.current = true;
-    const latest = [...characters].sort(
-      (a, b) => new Date(b.dateLastPlayed).getTime() - new Date(a.dateLastPlayed).getTime()
-    )[0];
-    if (latest) handleSelectCharacter(latest.characterId);
-  }, [characters, selectedCharId, handleSelectCharacter]);
-
   useEffect(() => {
     if (hasAutoLoaded.current) return;
     if (!isCaptain || !roundId) return;
@@ -725,6 +714,17 @@ export default function LobbyRoom({
       body: JSON.stringify({ lobbyId: lobby.id, characterId, isReady: true }),
     });
   }, [lobby.id]);
+
+  // Auto-select the most recently played character once characters load,
+  // but only if the player hasn't already picked one (e.g. from a previous join).
+  useEffect(() => {
+    if (hasAutoSelected.current || !characters.length || selectedCharId) return;
+    hasAutoSelected.current = true;
+    const latest = [...characters].sort(
+      (a, b) => new Date(b.dateLastPlayed).getTime() - new Date(a.dateLastPlayed).getTime()
+    )[0];
+    if (latest) handleSelectCharacter(latest.characterId);
+  }, [characters, selectedCharId, handleSelectCharacter]);
 
   const handleLoadIntersection = useCallback(async () => {
     setLoadingAction("intersection");
