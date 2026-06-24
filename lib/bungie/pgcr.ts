@@ -99,7 +99,10 @@ export async function collectPostMatchStats(
   // userId whose token `accessToken` is. Activity history must be queried for
   // THIS member, otherwise the bearer token won't match the membership being
   // requested and a private profile returns nothing (silently losing stats).
-  tokenOwnerUserId: string
+  tokenOwnerUserId: string,
+  // Only consider games that started after this timestamp (ISO string).
+  // Prevents matching games played before the roulette loadout was applied (#27).
+  appliedAfter?: string
 ): Promise<PostMatchResult | null> {
   if (!members.length || !rouletteHashes.length) return null;
 
@@ -107,6 +110,10 @@ export async function collectPostMatchStats(
   const source = members.find((m) => m.userId === tokenOwnerUserId) ?? members[0];
   const hashSet = new Set(rouletteHashes);
   const membershipIdSet = new Set(members.map((m) => m.membershipId));
+
+  // Only accept PGCRs from games that started at or after the apply time
+  // (with a 60-second buffer for clock skew).
+  const afterMs = appliedAfter ? new Date(appliedAfter).getTime() - 60_000 : 0;
 
   const activities = await getActivityHistory(
     source.membershipType,
@@ -117,6 +124,7 @@ export async function collectPostMatchStats(
   if (!activities.length) return null;
 
   for (const activity of activities) {
+    if (afterMs > 0 && new Date(activity.period).getTime() < afterMs) continue;
     const pgcr = await getPGCR(activity.activityDetails.instanceId);
     if (!pgcr) continue;
 

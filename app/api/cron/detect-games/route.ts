@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, tokenOwnerUserId);
+      const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, tokenOwnerUserId, appliedAt);
       if (!result) continue;
 
       const { playerStats, weaponKills } = result;
@@ -188,8 +188,10 @@ export async function GET(req: NextRequest) {
           .eq("lobby_id", lobbyId);
         await adminSupabase
           .from("lobbies")
-          .update({ current_round: nextRound, status: "waiting", last_active_at: new Date().toISOString() })
+          .update({ current_round: nextRound })
           .eq("id", lobbyId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await adminSupabase.from("lobbies").update({ status: "waiting", last_active_at: new Date().toISOString() } as any).eq("id", lobbyId);
       }
 
       processed++;

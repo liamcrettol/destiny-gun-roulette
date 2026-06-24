@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     // ── Step 5: Hit Bungie PGCR ──────────────────────────────────────────────
     const token = await getBungieToken(session.userId);
-    const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, session.userId);
+    const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, session.userId, appliedAt);
     if (!result) return NextResponse.json({ done: false, pending: true });
 
     const { playerStats, weaponKills, activityHash } = result;
