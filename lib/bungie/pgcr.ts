@@ -38,7 +38,7 @@ async function getActivityHistory(
   accessToken: string
 ): Promise<ActivityHistoryEntry[]> {
   const res = await fetch(
-    `${BUNGIE_ROOT}/Destiny2/${membershipType}/Account/${membershipId}/Character/${characterId}/Stats/Activities/?count=25&mode=0`,
+    `${BUNGIE_ROOT}/Destiny2/${membershipType}/Account/${membershipId}/Character/${characterId}/Stats/Activities/?count=50&mode=0`,
     {
       headers: {
         "X-API-Key": process.env.BUNGIE_API_KEY!,
