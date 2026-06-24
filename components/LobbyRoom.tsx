@@ -12,6 +12,7 @@ import SignOutButton from "./SignOutButton";
 import WeaponPool from "./WeaponPool";
 import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
+import { trimBungieName } from "@/lib/utils";
 
 interface PlayerStat {
   userId: string;
@@ -91,14 +92,13 @@ interface SessionTotal {
 
 // Running cumulative K/A/D per player across every recorded game this lobby.
 function SessionTotalsTable({ totals }: { totals: SessionTotal[] }) {
-  const sorted = [...totals].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills);
+  const sorted = [...totals].sort((a, b) => b.kills - a.kills);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-gray-500 text-xs border-b border-bungie-border">
             <th className="text-left pb-2 pr-4">Player</th>
-            <th className="text-right pb-2 pr-3">Roulette Kills</th>
             <th className="text-right pb-2 pr-3">K</th>
             <th className="text-right pb-2 pr-3">A</th>
             <th className="text-right pb-2 pr-3">D</th>
@@ -110,7 +110,6 @@ function SessionTotalsTable({ totals }: { totals: SessionTotal[] }) {
           {sorted.map((s, i) => (
             <tr key={s.userId} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
               <td className="py-2 pr-4 font-medium">{i === 0 ? "👑 " : ""}{s.displayName}</td>
-              <td className="py-2 pr-3 text-right font-bold text-bungie-blue">{s.rouletteWeaponKills}</td>
               <td className="py-2 pr-3 text-right">{s.kills}</td>
               <td className="py-2 pr-3 text-right">{s.assists}</td>
               <td className="py-2 pr-3 text-right">{s.deaths}</td>
@@ -125,7 +124,7 @@ function SessionTotalsTable({ totals }: { totals: SessionTotal[] }) {
 }
 
 function StatsTable({ stats }: { stats: PlayerStat[] }) {
-  const sorted = [...stats].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills);
+  const sorted = [...stats].sort((a, b) => b.kills - a.kills);
   const hasWon = stats.some((s) => s.won != null);
   return (
     <div className="overflow-x-auto">
@@ -134,7 +133,6 @@ function StatsTable({ stats }: { stats: PlayerStat[] }) {
           <tr className="text-gray-500 text-xs border-b border-bungie-border">
             <th className="text-left pb-2 pr-4">Player</th>
             {hasWon && <th className="text-right pb-2 pr-3">Result</th>}
-            <th className="text-right pb-2 pr-3">Roulette Kills</th>
             <th className="text-right pb-2 pr-3">K</th>
             <th className="text-right pb-2 pr-3">D</th>
             <th className="text-right pb-2 pr-3">A</th>
@@ -150,7 +148,6 @@ function StatsTable({ stats }: { stats: PlayerStat[] }) {
                   {s.won === true ? <span className="text-green-400">W</span> : s.won === false ? <span className="text-red-400">L</span> : <span className="text-gray-600">-</span>}
                 </td>
               )}
-              <td className="py-2 pr-3 text-right font-bold text-bungie-blue">{s.rouletteWeaponKills}</td>
               <td className="py-2 pr-3 text-right">{s.kills}</td>
               <td className="py-2 pr-3 text-right">{s.deaths}</td>
               <td className="py-2 pr-3 text-right">{s.assists}</td>
@@ -352,13 +349,13 @@ export default function LobbyRoom({
     const m = new Map<string, SessionTotal>();
     for (const round of roundHistory) {
       for (const s of round.stats) {
-        const e = m.get(s.userId) ?? { userId: s.userId, displayName: s.displayName, kills: 0, deaths: 0, assists: 0, rouletteWeaponKills: 0, games: 0 };
+        const e = m.get(s.userId) ?? { userId: s.userId, displayName: trimBungieName(s.displayName), kills: 0, deaths: 0, assists: 0, rouletteWeaponKills: 0, games: 0 };
         e.kills += s.kills;
         e.deaths += s.deaths;
         e.assists += s.assists;
         e.rouletteWeaponKills += s.rouletteWeaponKills;
         e.games += 1;
-        e.displayName = s.displayName;
+        e.displayName = trimBungieName(s.displayName);
         m.set(s.userId, e);
       }
     }
@@ -1031,7 +1028,7 @@ export default function LobbyRoom({
                 <div className="divide-y divide-bungie-border/40">
                   {[...roundHistory].reverse().map((round) => {
                     const isOpen = expandedRound === round.sessionId;
-                    const topPlayer = [...round.stats].sort((a, b) => b.rouletteWeaponKills - a.rouletteWeaponKills)[0];
+                    const topPlayer = [...round.stats].sort((a, b) => b.kills - a.kills)[0];
                     return (
                       <div key={round.sessionId}>
                         <button
@@ -1045,7 +1042,7 @@ export default function LobbyRoom({
                             )}
                             {topPlayer && (
                               <span className="text-xs text-gray-500">
-                                👑 {topPlayer.displayName} · {topPlayer.rouletteWeaponKills} kills
+                                👑 {topPlayer.displayName} · {topPlayer.kills}K {topPlayer.deaths}D
                               </span>
                             )}
                           </div>
@@ -1108,7 +1105,6 @@ export default function LobbyRoom({
                       <tr className="text-gray-500 text-xs border-b border-bungie-border">
                         <th className="text-left pb-2 pr-2">#</th>
                         <th className="text-left pb-2 pr-4">Player</th>
-                        <th className="text-right pb-2 pr-3">Roulette Kills</th>
                         <th className="text-right pb-2 pr-3">Games</th>
                         <th className="text-right pb-2 pr-3">W-L</th>
                         <th className="text-right pb-2">Avg K/D</th>
@@ -1119,7 +1115,6 @@ export default function LobbyRoom({
                         <tr key={e.userId} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
                           <td className="py-2 pr-2 text-gray-500 font-mono text-xs">{i + 1}</td>
                           <td className="py-2 pr-4 font-medium">{i === 0 ? "👑 " : ""}{e.displayName}</td>
-                          <td className="py-2 pr-3 text-right font-bold text-bungie-blue">{e.totalRouletteKills}</td>
                           <td className="py-2 pr-3 text-right">{e.gamesPlayed}</td>
                           <td className="py-2 pr-3 text-right tabular-nums">
                             {e.wins + e.losses > 0 ? (
@@ -1144,7 +1139,7 @@ export default function LobbyRoom({
             {members.map((m) => (
               <div key={m.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${m.is_captain ? "border-yellow-500 bg-yellow-500/10" : "border-bungie-border bg-bungie-dark"}`}>
                 {m.is_captain && <span>👑</span>}
-                <span className={m.selected_character_id ? "text-green-400" : "text-gray-300"}>{m.display_name}</span>
+                <span className={m.selected_character_id ? "text-green-400" : "text-gray-300"}>{trimBungieName(m.display_name)}</span>
                 {m.selected_character_id && <span className="text-green-500 text-xs" title="Guardian selected">✓</span>}
               </div>
             ))}
