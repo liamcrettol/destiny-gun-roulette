@@ -40,6 +40,8 @@ Early development / personal project.
 - [Match detection architecture](docs/match-detection.md) — how games are
   detected, recorded, and how captain rotation works (read this before touching
   the stats pipeline).
+- [Weapon variant pooling](docs/weapon-pooling.md) — how re-released / Adept /
+  craftable versions of the same gun are grouped (and what's still exact-hash).
 - [Database migrations](supabase/migrations/README.md) — migrations are applied
   **by hand**, not automatically. Check the status table before assuming a
   migration is live.
