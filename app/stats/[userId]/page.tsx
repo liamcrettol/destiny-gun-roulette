@@ -54,6 +54,29 @@ export default async function PlayerStatsPage({ params }: { params: Promise<{ us
 
   const TIER_COLOR: Record<number, string> = { 6: "text-yellow-400", 5: "text-purple-400", 4: "text-blue-400" };
 
+  // Extract weapon selection logic to improve testability and maintainability
+  function getMostCommonWeapon(roulette_hashes?: number[]): { weapon: WeaponEntry | null; count: number } {
+    if (!roulette_hashes?.length) {
+      return { weapon: null, count: 0 };
+    }
+
+    const hashFreq = new Map<number, number>();
+    for (const hash of roulette_hashes) {
+      hashFreq.set(hash, (hashFreq.get(hash) ?? 0) + 1);
+    }
+
+    const sortedEntries = [...hashFreq.entries()].sort((a, b) => b[1] - a[1]);
+    if (sortedEntries.length === 0) {
+      return { weapon: null, count: 0 };
+    }
+
+    const [mostCommonHash] = sortedEntries[0];
+    return {
+      weapon: weapons[mostCommonHash.toString()] ?? null,
+      count: roulette_hashes.length,
+    };
+  }
+
   return (
     <main className="min-h-screen p-6 w-full max-w-3xl mx-auto">
       <div className="mb-6">
@@ -143,7 +166,7 @@ export default async function PlayerStatsPage({ params }: { params: Promise<{ us
                 <th className="text-right px-3 py-2">D</th>
                 <th className="text-right px-3 py-2">A</th>
                 <th className="text-right px-4 py-2">K/D</th>
-                <th className="text-center px-3 py-2">Weapons</th>
+                <th className="text-left px-3 py-2">Weapons</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-bungie-border/40">
@@ -153,19 +176,8 @@ export default async function PlayerStatsPage({ params }: { params: Promise<{ us
                   ? new Date(session.played_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
                   : " - ";
 
-                // Find the most common weapon from roulette_hashes
-                let mostCommonWeapon: WeaponEntry | null = null;
-                let totalWeaponsRolled = 0;
-
-                if (session?.roulette_hashes && session.roulette_hashes.length > 0) {
-                  const hashFreq = new Map<number, number>();
-                  for (const hash of session.roulette_hashes) {
-                    hashFreq.set(hash, (hashFreq.get(hash) ?? 0) + 1);
-                  }
-                  const [[mostCommonHash]] = [...hashFreq.entries()].sort((a, b) => b[1] - a[1]);
-                  mostCommonWeapon = weapons[mostCommonHash.toString()] ?? null;
-                  totalWeaponsRolled = session.roulette_hashes.length;
-                }
+                // Get the most common weapon from this session's roulette hashes
+                const { weapon: mostCommonWeapon, count: totalWeaponsRolled } = getMostCommonWeapon(session?.roulette_hashes);
 
                 return (
                   <tr key={row.id} className="text-gray-300 hover:bg-bungie-dark/30 transition">
