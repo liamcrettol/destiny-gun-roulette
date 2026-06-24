@@ -4,6 +4,15 @@ import type { WeaponSlot } from "@/types/bungie";
 import type { ApplyResult } from "@/types/lobby";
 import type { RawWeapon } from "./rawInventory";
 
+const INVENTORY_SLOT_LIMIT = 9;
+
+export function isInventoryFull(characterId: string, roster: RawWeapon[]): boolean {
+  const characterWeapons = roster.filter(
+    (w) => w.location === "character" && w.characterId === characterId
+  );
+  return characterWeapons.length >= INVENTORY_SLOT_LIMIT;
+}
+
 const EXOTIC_TIER_TYPE = 6;
 const LEGENDARY_TIER_TYPE = 5;
 
