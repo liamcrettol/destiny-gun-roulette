@@ -691,6 +691,18 @@ export default function LobbyRoom({
     router.refresh();
   }, [lobby.id, router, stopPolling]);
 
+  const handleEndSession = useCallback(async () => {
+    if (!confirm("End this session for everyone? This will close the lobby.")) return;
+    stopPolling();
+    await fetch("/api/lobby/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lobbyId: lobby.id }),
+    });
+    router.push("/dashboard");
+    router.refresh();
+  }, [lobby.id, router, stopPolling]);
+
   // Picking a character is all a player needs to do - it persists their
   // selection so post-match stats can be collected. No separate "ready" step.
   const handleSelectCharacter = useCallback(async (characterId: string) => {
@@ -981,6 +993,11 @@ export default function LobbyRoom({
             <span className="text-sm text-gray-400">Round {lobbyData.current_round}</span>
             {polling && (
               <span className="text-xs text-green-500 animate-pulse">● watching</span>
+            )}
+            {isCaptain && (
+              <button onClick={handleEndSession} className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition">
+                End Session
+              </button>
             )}
             <button onClick={handleLeave} className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition">
               Leave
