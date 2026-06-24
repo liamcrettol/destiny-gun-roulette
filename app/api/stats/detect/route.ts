@@ -177,10 +177,12 @@ export async function POST(req: NextRequest) {
           .from("lobby_members")
           .update({ is_ready: false })
           .eq("lobby_id", lobbyId);
-        await adminSupabase
-          .from("lobbies")
-          .update({ current_round: nextRound, status: "waiting", last_active_at: new Date().toISOString() })
-          .eq("id", lobbyId);
+        // Separate update: current_round is critical and must succeed even if
+        // migration 008 hasn't been run (which adds last_active_at + status constraint).
+        await adminSupabase.from("lobbies").update({ current_round: nextRound }).eq("id", lobbyId);
+        // Best-effort status + timestamp update (requires migration 008).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await adminSupabase.from("lobbies").update({ status: "waiting", last_active_at: new Date().toISOString() } as any).eq("id", lobbyId);
       }
     }
 

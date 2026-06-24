@@ -133,11 +133,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Loadout applied - the fireteam is heading into a game.
-    await adminSupabase
-      .from("lobbies")
-      .update({ status: "in_game", last_active_at: appliedAt })
-      .eq("id", body.lobbyId);
+    // Best-effort: update status + last_active_at (requires migration 008).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await adminSupabase.from("lobbies").update({ status: "in_game", last_active_at: appliedAt } as any).eq("id", body.lobbyId);
 
     // Track that this player applied and check if captain should rotate.
     // The RPC atomically appends the player and returns true only for the

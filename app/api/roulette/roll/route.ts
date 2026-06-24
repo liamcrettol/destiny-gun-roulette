@@ -119,11 +119,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // A loadout is on the board now - lobby is actively rolling.
-    await adminSupabase
-      .from("lobbies")
-      .update({ status: "rolling", last_active_at: new Date().toISOString() })
-      .eq("id", body.lobbyId);
+    // Best-effort: update status + last_active_at (requires migration 008).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await adminSupabase.from("lobbies").update({ status: "rolling", last_active_at: new Date().toISOString() } as any).eq("id", body.lobbyId);
 
     return NextResponse.json({ roll });
   } catch (err) {
