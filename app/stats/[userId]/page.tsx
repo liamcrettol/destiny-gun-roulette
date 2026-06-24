@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import weaponsTable from "@/lib/bungie/data/weapons-table.json";
 import Image from "next/image";
+import WeaponIcon from "@/components/WeaponIcon";
 
 export const dynamic = "force-dynamic";
 
@@ -103,12 +104,12 @@ export default async function PlayerStatsPage({ params }: { params: Promise<{ us
           <div className="divide-y divide-bungie-border/40">
             {topWeapons.map((e) => (
               <div key={e.hash} className="flex items-center gap-3 px-4 py-3">
-                <div className="relative w-9 h-9 shrink-0 rounded overflow-hidden bg-bungie-dark">
-                  <Image src={e.def.icon} alt={e.def.name} fill className="object-cover" unoptimized />
-                  {e.def.watermark && (
-                    <Image src={e.def.watermark} alt="" fill className="object-cover absolute inset-0" unoptimized />
-                  )}
-                </div>
+                <WeaponIcon
+                  icon={e.def.icon}
+                  watermark={e.def.watermark}
+                  name={e.def.name}
+                  size="medium"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{e.def.name}</p>
                   <p className={`text-xs ${TIER_COLOR[e.def.tierType] ?? "text-gray-400"}`}>
