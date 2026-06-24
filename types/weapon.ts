@@ -23,6 +23,9 @@ export interface ResolvedWeapon {
   isEquipped: boolean;
   location: "character" | "vault" | "postmaster";
   characterId?: string; // which character it's on (if not vault)
+  barrel?: ResolvedPerk; // socket 1
+  magazine?: ResolvedPerk; // socket 2
+  masterwork?: ResolvedPerk; // socket 6+
   perks: ResolvedPerk[][]; // columns of perks (each column is an array of options)
   stats: ResolvedStat[];
   tierType: number; // 6=Exotic, 5=Legendary
