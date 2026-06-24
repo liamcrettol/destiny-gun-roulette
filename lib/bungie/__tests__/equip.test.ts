@@ -138,13 +138,13 @@ describe("ensureInventorySpace", () => {
 
   it("returns empty array when inventory is not full", async () => {
     const weapons = mockWeapons("char-1", 5);
-    const result = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    const result = await ensureInventorySpace("char-1", "token", 2, weapons);
     expect(result).toEqual([]);
   });
 
-  it("vaults weapon when inventory is full even without loadout exclusions", async () => {
+  it("vaults the last unequipped weapon when inventory is full", async () => {
     const weapons = mockWeapons("char-1", 9);
-    const result = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    const result = await ensureInventorySpace("char-1", "token", 2, weapons);
     expect(result).toHaveLength(1);
     expect(result[0].itemInstanceId).toBe("instance-8");
   });
@@ -152,24 +152,16 @@ describe("ensureInventorySpace", () => {
   it("returns empty array when no unequipped weapons available to vault", async () => {
     const weapons = mockWeapons("char-1", 9);
     weapons.forEach(w => w.isEquipped = true);
-    const result = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
+    const result = await ensureInventorySpace("char-1", "token", 2, weapons);
     expect(result).toEqual([]);
-  });
-
-  it("vaults the lowest-light unequipped weapon when inventory is full", async () => {
-    const weapons = mockWeapons("char-1", 9);
-    const clearResult = await ensureInventorySpace("char-1", weapons, "token", 2, 12345);
-    expect(clearResult).toHaveLength(1);
-    expect(clearResult[0].itemInstanceId).toBe("instance-8"); // lowest light
-    expect(clearResult[0].transferredToVault).toBe(true);
   });
 
   it("excludes loadout item instance IDs from being vaulted", async () => {
     const weapons = mockWeapons("char-1", 9);
     const loadoutIds = new Set(["instance-8", "instance-7"]);
-    const clearResult = await ensureInventorySpace("char-1", weapons, "token", 2, 12345, loadoutIds);
+    const clearResult = await ensureInventorySpace("char-1", "token", 2, weapons, undefined, loadoutIds);
     expect(clearResult).toHaveLength(1);
-    expect(clearResult[0].itemInstanceId).toBe("instance-6"); // next lowest light
+    expect(clearResult[0].itemInstanceId).toBe("instance-6"); // next last item
     expect(clearResult[0].transferredToVault).toBe(true);
   });
 
@@ -180,17 +172,17 @@ describe("ensureInventorySpace", () => {
     const otherCharWeapons = mockWeapons("char-2", 5);
 
     const allWeapons = [...charWeapons, ...vaultWeapons, ...otherCharWeapons];
-    const clearResult = await ensureInventorySpace("char-1", allWeapons, "token", 2, 12345);
+    const clearResult = await ensureInventorySpace("char-1", "token", 2, allWeapons);
 
     expect(clearResult).toHaveLength(1);
-    expect(clearResult[0].itemInstanceId).toBe("instance-8"); // lowest light on char-1
+    expect(clearResult[0].itemInstanceId).toBe("instance-8"); // last unequipped on char-1
     expect(clearResult[0].transferredToVault).toBe(true);
   });
 
   it("uses correct Bungie API parameters for transfer request", async () => {
     const weapons = mockWeapons("char-1", 9);
     const membershipType = 2;
-    await ensureInventorySpace("char-1", weapons, "token", membershipType, 12345);
+    await ensureInventorySpace("char-1", "token", membershipType, weapons);
 
     expect(clientModule.bungiePost).toHaveBeenCalledWith(
       "/Destiny2/Actions/Items/TransferItem/",
@@ -199,7 +191,7 @@ describe("ensureInventorySpace", () => {
         transferToVault: true,
         characterId: "char-1",
         membershipType,
-        itemReferenceHash: 1008, // instance-8 item hash
+        itemReferenceHash: 1008, // last item hash
         itemId: "instance-8",
       })
     );
