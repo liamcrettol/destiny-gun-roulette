@@ -575,15 +575,27 @@ export default function LobbyRoom({
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobby.id}` },
+        { event: "INSERT", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobby.id}` },
         (payload) => {
-          if (payload.eventType === "INSERT") {
-            setMembers((prev) => [...prev.filter((m) => m.id !== (payload.new as LobbyMember).id), payload.new as LobbyMember]);
-          } else if (payload.eventType === "UPDATE") {
-            setMembers((prev) => prev.map((m) => m.id === (payload.new as LobbyMember).id ? payload.new as LobbyMember : m));
-          } else if (payload.eventType === "DELETE") {
-            setMembers((prev) => prev.filter((m) => m.id !== (payload.old as LobbyMember).id));
-          }
+          setMembers((prev) => [...prev.filter((m) => m.id !== (payload.new as LobbyMember).id), payload.new as LobbyMember]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobby.id}` },
+        (payload) => {
+          setMembers((prev) => prev.map((m) => m.id === (payload.new as LobbyMember).id ? payload.new as LobbyMember : m));
+        }
+      )
+      .on(
+        "postgres_changes",
+        // DELETE without a filter: Supabase only includes the PK (id) in payload.old
+        // unless REPLICA IDENTITY FULL is set (see migration 011). We filter by checking
+        // if the deleted id is actually in our current members list.
+        { event: "DELETE", schema: "public", table: "lobby_members" },
+        (payload) => {
+          const deletedId = (payload.old as { id?: string }).id;
+          if (deletedId) setMembers((prev) => prev.filter((m) => m.id !== deletedId));
         }
       )
       .on(
