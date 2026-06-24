@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { bungieGet } from "@/lib/bungie/client";
-import { getPerkNames, getPerkIcons, getWeaponDefinitions } from "@/lib/bungie/definitions";
+import { getPerkIcons, getPerkInfos, getWeaponDefinitions } from "@/lib/bungie/definitions";
 import { z } from "zod";
 import type { WeaponSlot } from "@/types/bungie";
 
@@ -36,11 +36,12 @@ const STAT_NAMES: Record<number, string> = {
   2762071195: "Guard Efficiency",
 };
 
+interface Perk { name: string; description: string }
 interface RollInstance {
   instanceId: string;
   location: "character" | "vault";
   perkHashes: number[];
-  perks: string[];
+  perks: Perk[];
   perkIcons: Record<number, string>;
   stats: Record<string, number>;
   lightLevel: number;
@@ -50,6 +51,7 @@ interface MemberRolls {
   displayName: string;
   isMe: boolean;
   instances: RollInstance[];
+  failed?: boolean; // their profile/inventory couldn't be read (e.g. privacy)
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,7 +88,8 @@ export async function POST(req: NextRequest) {
 
     // Fetch each member's instances of the loadout weapons in parallel.
     const perMember = await Promise.all(
-      members.map(async (member): Promise<{ userId: string; displayName: string; isMe: boolean; byHash: Map<number, RollInstance[]> } | null> => {
+      members.map(async (member): Promise<{ userId: string; displayName: string; isMe: boolean; byHash: Map<number, RollInstance[]>; failed: boolean }> => {
+        const baseInfo = { userId: member.user_id, displayName: member.display_name, isMe: member.user_id === session.userId };
         try {
           const token = await getBungieToken(member.user_id);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,45 +148,48 @@ export async function POST(req: NextRequest) {
           }
           for (const item of asArray(profile?.profileInventory?.data?.items)) consider(item, "vault");
 
-          return { userId: member.user_id, displayName: member.display_name, isMe: member.user_id === session.userId, byHash };
+          return { ...baseInfo, byHash, failed: false };
         } catch {
-          return null;
+          // Couldn't read this member's profile (token expired, privacy, etc.).
+          // Still return a column so they don't silently vanish.
+          return { ...baseInfo, byHash: new Map<number, RollInstance[]>(), failed: true };
         }
       })
     );
 
-    // Resolve all perk plug hashes to names and icons in one pass; base stats per weapon.
-    const [perkNameMap, perkIconMap, defs] = await Promise.all([
-      getPerkNames([...allPerkHashes]),
+    // Resolve all perk plug hashes to { name, description } in one pass; base
+    // stats per weapon. Cosmetic plugs (shaders/ornaments) aren't in the perk
+    // map, so they're dropped here.
+    const [perkInfoMap, perkIconMap, defs] = await Promise.all([
+      getPerkInfos([...allPerkHashes]),
       getPerkIcons([...allPerkHashes]),
       getWeaponDefinitions([...loadoutHashes]),
     ]);
-    const nameOf = (h: number) => perkNameMap.get(h) ?? "Unknown";
-    const iconOf = (h: number) => perkIconMap.get(h) ?? "";
 
-    // Build the response: per slot -> { itemHash, baseStats, members: [{...instances}] }
-    const slots: Record<string, { itemHash: number; baseStats: Record<string, number>; members: MemberRolls[] }> = {};
+    // Build the response: per slot -> { itemHash, damageType, baseStats, members: [...] }
+    const slots: Record<string, { itemHash: number; damageType: string; baseStats: Record<string, number>; members: MemberRolls[] }> = {};
     for (const [slot, hash] of Object.entries(slotHash) as [WeaponSlot, number][]) {
       const memberRolls: MemberRolls[] = [];
       for (const m of perMember) {
-        if (!m) continue;
         const instances = (m.byHash.get(hash) ?? []).map((inst) => {
+          const perkHashes = inst.perkHashes.filter((h) => perkInfoMap.has(h));
           const perkIcons: Record<number, string> = {};
-          inst.perkHashes.forEach((h) => {
-            const icon = iconOf(h);
+          perkHashes.forEach((h) => {
+            const icon = perkIconMap.get(h);
             if (icon) perkIcons[h] = icon;
           });
           return {
             ...inst,
-            perks: inst.perkHashes.map(nameOf),
+            perkHashes,
+            perks: perkHashes.map((h) => perkInfoMap.get(h) as Perk),
             perkIcons,
           };
         });
-        memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances });
+        memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances, failed: m.failed });
       }
       // Put the caller first.
       memberRolls.sort((a, b) => (a.isMe === b.isMe ? 0 : a.isMe ? -1 : 1));
-      slots[slot] = { itemHash: hash, baseStats: defs.get(hash)?.stats ?? {}, members: memberRolls };
+      slots[slot] = { itemHash: hash, damageType: defs.get(hash)?.damageType ?? "", baseStats: defs.get(hash)?.stats ?? {}, members: memberRolls };
     }
 
     return NextResponse.json({ slots });

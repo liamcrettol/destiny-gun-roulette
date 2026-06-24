@@ -18,6 +18,7 @@ const schema = z.object({
     icon: z.string(),
     weaponType: z.string(),
     damageType: z.string(),
+    ammoType: z.string().optional(),
     tierType: z.number().optional(),
     stats: z.record(z.string(), z.number()).optional(),
   })),
@@ -35,7 +36,7 @@ const schema = z.object({
     power: z.array(z.number()).optional(),
   }).optional(),
   wildcardSlots: z.array(z.enum(["kinetic", "energy", "power"])).optional(),
-  mode: z.enum(["normal", "chaos", "meta", "mismatch"]).optional(),
+  mode: z.enum(["normal", "chaos", "meta"]).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -117,6 +118,12 @@ export async function POST(req: NextRequest) {
         { onConflict: "round_id,slot" }
       );
     }
+
+    // A loadout is on the board now - lobby is actively rolling.
+    await adminSupabase
+      .from("lobbies")
+      .update({ status: "rolling", last_active_at: new Date().toISOString() })
+      .eq("id", body.lobbyId);
 
     return NextResponse.json({ roll });
   } catch (err) {

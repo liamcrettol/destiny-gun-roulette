@@ -89,6 +89,12 @@ export async function joinLobby(
 
   if (memberErr || !member) throw new Error(memberErr?.message ?? "Failed to join");
 
+  // Someone just joined - mark the lobby active.
+  await adminSupabase
+    .from("lobbies")
+    .update({ last_active_at: new Date().toISOString() })
+    .eq("id", lobby.id);
+
   return { lobby, member };
 }
 

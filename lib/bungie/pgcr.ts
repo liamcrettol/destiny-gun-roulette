@@ -89,6 +89,7 @@ export interface WeaponKillStat {
 export interface PostMatchResult {
   playerStats: CollectedPlayerStat[];
   weaponKills: WeaponKillStat[];
+  activityHash: number;
 }
 
 export async function collectPostMatchStats(
@@ -125,9 +126,13 @@ export async function collectPostMatchStats(
     );
     if (![...membershipIdSet].every((id) => pgcrMemberIds.has(id))) continue;
 
-    // At least one member must have a kill with a roulette weapon
-    const anyRouletteKill = pgcr.entries.some((e) =>
-      e.extended?.weapons?.some((w) => hashSet.has(w.referenceId))
+    // At least one FIRETEAM MEMBER must have a kill with a roulette weapon
+    // (ignore opponents who happen to use the same gun, so we don't match the
+    // wrong game).
+    const anyRouletteKill = pgcr.entries.some(
+      (e) =>
+        membershipIdSet.has(e.player.destinyUserInfo.membershipId) &&
+        e.extended?.weapons?.some((w) => hashSet.has(w.referenceId))
     );
     if (!anyRouletteKill) continue;
 
@@ -154,9 +159,11 @@ export async function collectPostMatchStats(
       return { userId: member.userId, displayName: member.displayName, kills, deaths, assists, kd, rouletteWeaponKills, won };
     });
 
-    // Aggregate kills per roulette weapon across all players
+    // Aggregate kills per roulette weapon across the FIRETEAM only (not the
+    // whole lobby - otherwise opponents using the same gun inflate the totals).
     const killsByHash = new Map<number, number>();
     for (const entry of pgcr.entries) {
+      if (!membershipIdSet.has(entry.player.destinyUserInfo.membershipId)) continue;
       for (const w of entry.extended?.weapons ?? []) {
         if (hashSet.has(w.referenceId)) {
           killsByHash.set(
@@ -168,7 +175,7 @@ export async function collectPostMatchStats(
     }
     const weaponKills: WeaponKillStat[] = [...killsByHash.entries()].map(([itemHash, totalKills]) => ({ itemHash, totalKills }));
 
-    return { playerStats, weaponKills };
+    return { playerStats, weaponKills, activityHash: activity.activityDetails.referenceId };
   }
 
   return null;

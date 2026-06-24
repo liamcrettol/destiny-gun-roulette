@@ -5,9 +5,11 @@ export interface Lobby {
   code: string;
   host_user_id: string;
   captain_user_id: string;
-  status: "waiting" | "rolling" | "applying" | "done";
+  status: "waiting" | "rolling" | "applying" | "in_game" | "done";
   current_round: number;
   created_at: string;
+  last_active_at?: string;
+  captain_locked?: boolean;
 }
 
 export interface LobbyMember {
