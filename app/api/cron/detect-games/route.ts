@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { getBungieToken } from "@/lib/auth/helpers";
-import { collectPostMatchStats, resolveActivityName } from "@/lib/bungie/pgcr";
-import { rotateCaptain } from "@/lib/lobby";
+import { detectAndRecordGame } from "@/lib/stats/record";
 
 // Vercel Cron calls this every 5 minutes with Authorization: Bearer CRON_SECRET.
 // It finds lobbies that have a pending apply but no saved game session and runs
@@ -136,105 +135,20 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, tokenOwnerUserId, appliedAt);
-      if (!result) continue;
+      // Same shared pipeline the client detect route uses, so recording stays
+      // identical across both paths. No lease needed here: the cron is the
+      // backstop and the unique index still guards against a concurrent insert.
+      const outcome = await detectAndRecordGame({
+        lobbyId,
+        roundId,
+        appliedAt,
+        members: memberInputs,
+        rouletteHashes,
+        token,
+        tokenOwnerUserId,
+      });
 
-      const { playerStats, weaponKills, activityHash } = result;
-
-      // Race check
-      const { data: raceCheck } = await adminSupabase
-        .from("game_sessions")
-        .select("id")
-        .eq("lobby_id", lobbyId)
-        .gte("played_at", appliedAt)
-        .limit(1)
-        .maybeSingle();
-
-      if (raceCheck) {
-        processed++;
-        continue;
-      }
-
-      const mapName = await resolveActivityName(activityHash);
-
-      // Mirror the detect route's columns so cron-recorded games still show
-      // their map name and weapons in history. The unique index on round_id
-      // guards against a duplicate if the detect route raced us.
-      const { data: gameSession } = await adminSupabase
-        .from("game_sessions")
-        .insert({
-          lobby_id: lobbyId,
-          player_count: playerStats.length,
-          roulette_hashes: rouletteHashes,
-          round_id: roundId,
-          map_name: mapName,
-          activity_hash: activityHash,
-        })
-        .select()
-        .single();
-
-      if (!gameSession) continue;
-
-      await adminSupabase.from("player_game_stats").insert(
-        playerStats.map((s) => ({
-          game_session_id: gameSession.id,
-          user_id: s.userId,
-          display_name: s.displayName,
-          kills: s.kills,
-          deaths: s.deaths,
-          assists: s.assists,
-          kd: s.kd,
-          roulette_weapon_kills: s.rouletteWeaponKills,
-          won: s.won,
-        }))
-      );
-
-      if (weaponKills.length) {
-        await adminSupabase.from("weapon_round_kills").insert(
-          weaponKills.map((w: { itemHash: number; totalKills: number }) => ({
-            game_session_id: gameSession.id,
-            item_hash: w.itemHash,
-            total_kills: w.totalKills,
-          }))
-        );
-      }
-
-      // Only rotate if the apply route didn't already do it for this round
-      const { data: roundState } = await adminSupabase
-        .from("lobby_rounds")
-        .select("captain_rotated")
-        .eq("id", roundId)
-        .single();
-
-      if (!roundState?.captain_rotated) {
-        await rotateCaptain(lobbyId);
-      }
-
-      const { data: currentLobby } = await adminSupabase
-        .from("lobbies")
-        .select("current_round")
-        .eq("id", lobbyId)
-        .single();
-
-      if (currentLobby) {
-        const nextRound = currentLobby.current_round + 1;
-        await adminSupabase.from("lobby_rounds").insert({
-          lobby_id: lobbyId,
-          round_number: nextRound,
-          status: "pending",
-        });
-        await adminSupabase
-          .from("lobby_members")
-          .update({ is_ready: false })
-          .eq("lobby_id", lobbyId);
-        await adminSupabase
-          .from("lobbies")
-          .update({ current_round: nextRound })
-          .eq("id", lobbyId);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await adminSupabase.from("lobbies").update({ status: "waiting", last_active_at: new Date().toISOString() } as any).eq("id", lobbyId);
-      }
-
+      if (outcome.status === "no_game") continue;
       processed++;
     } catch (e) {
       errors.push(`${lobbyId}: ${e instanceof Error ? e.message : String(e)}`);

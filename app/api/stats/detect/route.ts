@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
-import { collectPostMatchStats, resolveActivityName } from "@/lib/bungie/pgcr";
-import { rotateCaptain } from "@/lib/lobby";
+import { detectAndRecordGame } from "@/lib/stats/record";
 import { z } from "zod";
 
 const schema = z.object({ lobbyId: z.string().uuid() });
+
+// How long one worker holds the detection slot. Slightly longer than the client
+// poll interval so a single scan covers a cycle without the herd piling on, but
+// short enough that detection isn't delayed if that worker bails.
+const DETECT_LEASE_SECONDS = 20;
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,111 +99,29 @@ export async function POST(req: NextRequest) {
     const callerMember = members.find((m) => m.user_id === session.userId);
     if (!callerMember?.selected_character_id) return NextResponse.json({ done: false, pending: true });
 
-    // ── Step 5: Hit Bungie PGCR ──────────────────────────────────────────────
+    // ── Step 5: Claim the detection slot ─────────────────────────────────────
+    // Only one worker scans Bungie per cycle; everyone else returns pending and
+    // picks up the recorded game via realtime. Avoids N redundant PGCR scans.
+    const { data: claimed } = await adminSupabase.rpc("claim_detection", {
+      p_round_id: recentHistory.round_id,
+      p_ttl_seconds: DETECT_LEASE_SECONDS,
+    });
+    if (!claimed) return NextResponse.json({ done: false, pending: true });
+
+    // ── Step 6: Scan + record via the shared pipeline ────────────────────────
     const token = await getBungieToken(session.userId);
-    const result = await collectPostMatchStats(memberInputs, rouletteHashes, token, session.userId, appliedAt);
-    if (!result) return NextResponse.json({ done: false, pending: true });
+    const outcome = await detectAndRecordGame({
+      lobbyId,
+      roundId: recentHistory.round_id,
+      appliedAt,
+      members: memberInputs,
+      rouletteHashes,
+      token,
+      tokenOwnerUserId: session.userId,
+    });
 
-    const { playerStats, weaponKills, activityHash } = result;
-
-    // ── Step 6: Race check ──────────────────────────────────────────────────
-    const { data: raceCheck } = await adminSupabase
-      .from("game_sessions")
-      .select("id")
-      .eq("lobby_id", lobbyId)
-      .gte("played_at", appliedAt)
-      .limit(1)
-      .maybeSingle();
-
-    if (raceCheck) return NextResponse.json({ done: true, stats: playerStats });
-
-    // ── Step 7: Resolve map name ─────────────────────────────────────────────
-    const mapName = await resolveActivityName(activityHash);
-
-    // ── Step 8: Persist the game session ────────────────────────────────────
-    // The unique index on game_sessions(round_id) is the real race guard: if a
-    // concurrent poller already inserted this round, the insert fails and we
-    // return the stats we computed without double-recording.
-    const { data: gameSession } = await adminSupabase
-      .from("game_sessions")
-      .insert({
-        lobby_id: lobbyId,
-        player_count: playerStats.length,
-        roulette_hashes: rouletteHashes,
-        round_id: recentHistory.round_id,
-        map_name: mapName,
-        activity_hash: activityHash,
-      })
-      .select()
-      .single();
-
-    if (gameSession) {
-      await adminSupabase.from("player_game_stats").insert(
-        playerStats.map((s) => ({
-          game_session_id: gameSession.id,
-          user_id: s.userId,
-          display_name: s.displayName,
-          kills: s.kills,
-          deaths: s.deaths,
-          assists: s.assists,
-          kd: s.kd,
-          roulette_weapon_kills: s.rouletteWeaponKills,
-          won: s.won,
-        }))
-      );
-
-      if (weaponKills.length) {
-        await adminSupabase.from("weapon_round_kills").insert(
-          weaponKills.map((w) => ({
-            game_session_id: gameSession.id,
-            item_hash: w.itemHash,
-            total_kills: w.totalKills,
-          }))
-        );
-      }
-
-      // Fallback rotation: if the apply route didn't rotate (not everyone applied
-      // before the game ended and the round advanced), rotate here instead.
-      const { data: roundState } = await adminSupabase
-        .from("lobby_rounds")
-        .select("captain_rotated")
-        .eq("id", recentHistory.round_id)
-        .single();
-
-      const { data: lobbyMeta } = await adminSupabase
-        .from("lobbies")
-        .select("current_round, captain_locked")
-        .eq("id", lobbyId)
-        .single();
-
-      if (!roundState?.captain_rotated && !lobbyMeta?.captain_locked) {
-        await rotateCaptain(lobbyId);
-      }
-
-      // Advance to next round
-      const lobby = lobbyMeta;
-
-      if (lobby) {
-        const nextRound = lobby.current_round + 1;
-        await adminSupabase.from("lobby_rounds").insert({
-          lobby_id: lobbyId,
-          round_number: nextRound,
-          status: "pending",
-        });
-        await adminSupabase
-          .from("lobby_members")
-          .update({ is_ready: false })
-          .eq("lobby_id", lobbyId);
-        // Separate update: current_round is critical and must succeed even if
-        // migration 008 hasn't been run (which adds last_active_at + status constraint).
-        await adminSupabase.from("lobbies").update({ current_round: nextRound }).eq("id", lobbyId);
-        // Best-effort status + timestamp update (requires migration 008).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await adminSupabase.from("lobbies").update({ status: "waiting", last_active_at: new Date().toISOString() } as any).eq("id", lobbyId);
-      }
-    }
-
-    return NextResponse.json({ done: true, stats: playerStats });
+    if (outcome.status === "no_game") return NextResponse.json({ done: false, pending: true });
+    return NextResponse.json({ done: true, stats: outcome.stats });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     const status = msg === "Unauthorized" ? 401 : 500;
