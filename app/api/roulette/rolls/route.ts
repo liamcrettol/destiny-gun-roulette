@@ -128,6 +128,14 @@ export async function POST(req: NextRequest) {
               allPerkHashes.add(s.plugHash);
             }
 
+            const barrelHash = socketData[id]?.sockets?.[1]?.plugHash;
+            const magazineHash = socketData[id]?.sockets?.[2]?.plugHash;
+            const masterworkHash = socketData[id]?.sockets?.[6]?.plugHash;
+
+            if (barrelHash) allPerkHashes.add(barrelHash);
+            if (magazineHash) allPerkHashes.add(magazineHash);
+            if (masterworkHash) allPerkHashes.add(masterworkHash);
+
             const stats: Record<string, number> = {};
             const rawStats = statData[id]?.stats ?? {};
             for (const [statHash, val] of Object.entries(rawStats)) {
@@ -141,6 +149,9 @@ export async function POST(req: NextRequest) {
               perkHashes,
               perks: [],
               perkIcons: {},
+              barrelHash,
+              magazineHash,
+              masterworkHash,
               stats,
               lightLevel: instanceData[id]?.primaryStat?.value ?? 0,
             };
