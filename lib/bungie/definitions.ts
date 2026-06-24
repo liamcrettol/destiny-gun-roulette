@@ -16,6 +16,7 @@
 import weaponsRaw from "./data/weapons-table.json";
 import perkNamesRaw from "./data/perk-names.json";
 import perkDataRaw from "./data/perk-data.json";
+import perkIconsRaw from "./data/perk-icons.json";
 
 export interface WeaponDefinition {
   itemHash: number;
@@ -43,6 +44,7 @@ const WEAPONS: Map<number, WeaponDefinition> = (() => {
 
 const PERK_NAMES = perkNamesRaw as unknown as Record<string, string>;
 const PERK_DATA = perkDataRaw as unknown as Record<string, { n: string; d: string }>;
+const PERK_ICONS = perkIconsRaw as unknown as Record<string, string>;
 
 export interface PerkInfo { name: string; description: string }
 
@@ -84,6 +86,15 @@ export async function getPerkNames(hashes: number[]): Promise<Map<number, string
 
 export async function getPerkName(hash: number): Promise<string | null> {
   return PERK_NAMES[hash.toString()] ?? null;
+}
+
+export async function getPerkIcons(hashes: number[]): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+  for (const hash of hashes) {
+    const icon = PERK_ICONS[hash.toString()];
+    if (icon) result.set(hash, icon);
+  }
+  return result;
 }
 
 // No-op kept for call-site compatibility - definitions are now static, so there

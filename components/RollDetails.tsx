@@ -8,7 +8,9 @@ export interface Perk { name: string; description: string }
 export interface RollInstance {
   instanceId: string;
   location: "character" | "vault";
+  perkHashes: number[];
   perks: Perk[];
+  perkIcons: Record<number, string>;
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -167,15 +169,28 @@ export default function RollDetails({
             return (
               <div key={`p-${m.userId}`} className="text-center px-0.5">
                 {inst ? (
-                  <p className={`text-[10px] leading-tight ${m.isMe ? theme.text : "text-gray-400"}`}>
-                    {inst.perks.length
-                      ? inst.perks.map((p, i) => (
-                          <span key={p.name} title={p.description || undefined} className={p.description ? "cursor-help" : undefined}>
-                            {p.name}{i < inst.perks.length - 1 ? " · " : ""}
-                          </span>
-                        ))
-                      : "—"}
-                  </p>
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    {inst.perkHashes.length
+                      ? inst.perkHashes.map((hash, i) => {
+                          const perk = inst.perks[i];
+                          if (!perk) return null;
+                          const icon = inst.perkIcons[hash];
+                          return icon ? (
+                            <img
+                              key={`${hash}-${i}`}
+                              src={icon}
+                              alt={perk.name}
+                              title={perk.description || perk.name}
+                              className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
+                            />
+                          ) : (
+                            <span key={`${hash}-${i}`} title={perk.description || undefined} className={`text-[10px] leading-tight ${m.isMe ? theme.text : "text-gray-400"}`}>
+                              {perk.name}
+                            </span>
+                          );
+                        })
+                      : <span className="text-[10px] text-gray-500">—</span>}
+                  </div>
                 ) : (
                   <p className="text-[10px] text-gray-600" title={m.failed ? "Couldn't read their inventory - they may need to allow inventory access in their Bungie.net privacy settings" : undefined}>
                     {m.failed ? "couldn't load" : "doesn't own"}

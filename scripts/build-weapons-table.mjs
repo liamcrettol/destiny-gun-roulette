@@ -73,6 +73,7 @@ async function main() {
   const weapons = {};
   const perkNames = {};
   const perkData = {};
+  const perkIcons = {};
   for (const key in all) {
     const def = all[key];
 
@@ -113,16 +114,20 @@ async function main() {
         n: def.displayProperties.name,
         d: def.displayProperties.description || "",
       };
+      if (def.displayProperties?.icon) {
+        perkIcons[key] = CDN + def.displayProperties.icon;
+      }
     }
   }
 
   writeFileSync(`${DATA_DIR}/weapons-table.json`, JSON.stringify(weapons));
   writeFileSync(`${DATA_DIR}/perk-names.json`, JSON.stringify(perkNames));
   writeFileSync(`${DATA_DIR}/perk-data.json`, JSON.stringify(perkData));
+  writeFileSync(`${DATA_DIR}/perk-icons.json`, JSON.stringify(perkIcons));
   writeFileSync(versionFile, version + "\n");
 
   console.log(
-    `Wrote ${Object.keys(weapons).length} weapons, ${Object.keys(perkData).length} perks (manifest ${version}).`
+    `Wrote ${Object.keys(weapons).length} weapons, ${Object.keys(perkData).length} perks with ${Object.keys(perkIcons).length} icons (manifest ${version}).`
   );
 }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getBungieToken } from "@/lib/auth/helpers";
 import { adminSupabase } from "@/lib/supabase/admin";
 import { bungieGet } from "@/lib/bungie/client";
-import { getPerkInfos, getWeaponDefinitions } from "@/lib/bungie/definitions";
+import { getPerkIcons, getPerkInfos, getWeaponDefinitions } from "@/lib/bungie/definitions";
 import { z } from "zod";
 import type { WeaponSlot } from "@/types/bungie";
 
@@ -42,6 +42,7 @@ interface RollInstance {
   location: "character" | "vault";
   perkHashes: number[];
   perks: Perk[];
+  perkIcons: Record<number, string>;
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
               location,
               perkHashes,
               perks: [],
+              perkIcons: {},
               stats,
               lightLevel: instanceData[id]?.primaryStat?.value ?? 0,
             };
@@ -158,8 +160,9 @@ export async function POST(req: NextRequest) {
     // Resolve all perk plug hashes to { name, description } in one pass; base
     // stats per weapon. Cosmetic plugs (shaders/ornaments) aren't in the perk
     // map, so they're dropped here.
-    const [perkInfoMap, defs] = await Promise.all([
+    const [perkInfoMap, perkIconMap, defs] = await Promise.all([
       getPerkInfos([...allPerkHashes]),
+      getPerkIcons([...allPerkHashes]),
       getWeaponDefinitions([...loadoutHashes]),
     ]);
 
@@ -168,13 +171,20 @@ export async function POST(req: NextRequest) {
     for (const [slot, hash] of Object.entries(slotHash) as [WeaponSlot, number][]) {
       const memberRolls: MemberRolls[] = [];
       for (const m of perMember) {
-        const instances = (m.byHash.get(hash) ?? []).map((inst) => ({
-          ...inst,
-          // Resolve to {name, description}, dropping any cosmetic plugs.
-          perks: inst.perkHashes
-            .map((h) => perkInfoMap.get(h))
-            .filter((p): p is Perk => !!p),
-        }));
+        const instances = (m.byHash.get(hash) ?? []).map((inst) => {
+          const perkHashes = inst.perkHashes.filter((h) => perkInfoMap.has(h));
+          const perkIcons: Record<number, string> = {};
+          perkHashes.forEach((h) => {
+            const icon = perkIconMap.get(h);
+            if (icon) perkIcons[h] = icon;
+          });
+          return {
+            ...inst,
+            perkHashes,
+            perks: perkHashes.map((h) => perkInfoMap.get(h) as Perk),
+            perkIcons,
+          };
+        });
         memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances, failed: m.failed });
       }
       // Put the caller first.
