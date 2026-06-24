@@ -261,6 +261,7 @@ export default function LobbyRoom({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedWatch, setCopiedWatch] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasAutoSelected = useRef(false);
 
   // Stats panel tab: session totals | match history | global leaderboard
   const [statsTab, setStatsTab] = useState<"session" | "history" | "leaderboard">("session");
@@ -630,6 +631,17 @@ export default function LobbyRoom({
       .then((r) => r.json())
       .then((d) => { if (d.characters) setCharacters(d.characters); });
   }, []);
+
+  // Auto-select the most recently played character once characters load,
+  // but only if the player hasn't already picked one (e.g. from a previous join).
+  useEffect(() => {
+    if (hasAutoSelected.current || !characters.length || selectedCharId) return;
+    hasAutoSelected.current = true;
+    const latest = [...characters].sort(
+      (a, b) => new Date(b.dateLastPlayed).getTime() - new Date(a.dateLastPlayed).getTime()
+    )[0];
+    if (latest) handleSelectCharacter(latest.characterId);
+  }, [characters, selectedCharId, handleSelectCharacter]);
 
   useEffect(() => {
     if (hasAutoLoaded.current) return;
@@ -1173,7 +1185,9 @@ export default function LobbyRoom({
           <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
             <h2 className="text-white font-semibold mb-1">Your Character</h2>
             <p className="text-xs text-gray-500 mb-3">
-              Pick your guardian, that&apos;s it. Your selection saves automatically so your stats get tracked.
+              {selectedCharId
+                ? "Your most recent guardian was auto-selected. Tap another to switch."
+                : "Pick your guardian. Your selection saves automatically so your stats get tracked."}
             </p>
             <div className="flex gap-3 flex-wrap">
               {[...characters]
