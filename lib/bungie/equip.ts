@@ -13,6 +13,22 @@ export function isInventoryFull(characterId: string, roster: RawWeapon[]): boole
   return characterWeapons.length >= INVENTORY_SLOT_LIMIT;
 }
 
+export function findLastWeapon(
+  characterId: string,
+  roster: RawWeapon[],
+  excludeInstanceIds: Set<string> = new Set()
+): RawWeapon | null {
+  const candidates = roster.filter(
+    (w) =>
+      w.location === "character" &&
+      w.characterId === characterId &&
+      !w.isEquipped &&
+      !excludeInstanceIds.has(w.itemInstanceId)
+  );
+  // Return the last weapon in the filtered list (highest index)
+  return candidates[candidates.length - 1] ?? null;
+}
+
 export function findLowestLightWeapon(
   characterId: string,
   roster: RawWeapon[],

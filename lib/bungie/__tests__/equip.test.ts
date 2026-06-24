@@ -1,4 +1,4 @@
-import { isInventoryFull, findLowestLightWeapon } from "../equip";
+import { isInventoryFull, findLowestLightWeapon, findLastWeapon } from "../equip";
 import type { RawWeapon } from "../rawInventory";
 
 describe("isInventoryFull", () => {
@@ -123,5 +123,75 @@ describe("findLowestLightWeapon", () => {
       new Set(["instance-0"])
     );
     expect(result?.lightLevel).toBe(740);
+  });
+});
+
+describe("findLastWeapon", () => {
+  const mockWeapons = (characterId: string, count: number = 5): RawWeapon[] => {
+    return Array.from({ length: count }, (_, i) => ({
+      itemHash: 1000 + i,
+      itemInstanceId: `instance-${i}`,
+      slot: (["kinetic", "energy", "power"][i % 3]) as any,
+      location: "character" as const,
+      characterId,
+      isEquipped: false,
+      lightLevel: 750,
+      tierType: 5,
+    }));
+  };
+
+  it("returns the last unequipped weapon on character", () => {
+    const weapons = mockWeapons("char-1", 3);
+    const result = findLastWeapon("char-1", weapons);
+    expect(result?.itemInstanceId).toBe("instance-2");
+  });
+
+  it("returns null when no weapons available on character", () => {
+    const weapons = mockWeapons("char-1", 0);
+    const result = findLastWeapon("char-1", weapons);
+    expect(result).toBeNull();
+  });
+
+  it("ignores vault weapons", () => {
+    const charWeapons = mockWeapons("char-1", 2);
+    const vaultWeapons: RawWeapon[] = [
+      {
+        itemHash: 2000,
+        itemInstanceId: "vault-weapon",
+        slot: "kinetic",
+        location: "vault",
+        isEquipped: false,
+        lightLevel: 700,
+        tierType: 5,
+      },
+    ];
+    const result = findLastWeapon("char-1", [...charWeapons, ...vaultWeapons]);
+    expect(result?.itemInstanceId).toBe("instance-1");
+  });
+
+  it("ignores equipped weapons", () => {
+    const weapons = mockWeapons("char-1", 3);
+    weapons[2].isEquipped = true; // mark last as equipped
+    const result = findLastWeapon("char-1", weapons);
+    // Should return instance-1, not the equipped instance-2
+    expect(result?.itemInstanceId).toBe("instance-1");
+  });
+
+  it("returns null when only equipped weapons exist", () => {
+    const weapons = mockWeapons("char-1", 2);
+    weapons.forEach(w => w.isEquipped = true);
+    const result = findLastWeapon("char-1", weapons);
+    expect(result).toBeNull();
+  });
+
+  it("excludes specified item instance IDs", () => {
+    const weapons = mockWeapons("char-1", 3);
+    const result = findLastWeapon(
+      "char-1",
+      weapons,
+      new Set(["instance-2"])
+    );
+    // Should return instance-1, not the excluded instance-2
+    expect(result?.itemInstanceId).toBe("instance-1");
   });
 });
