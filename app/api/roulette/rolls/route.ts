@@ -43,6 +43,15 @@ interface RollInstance {
   perkHashes: number[];
   perks: Perk[];
   perkIcons: Record<number, string>;
+  barrelHash?: number;
+  barrelName?: string;
+  barrelIcon?: string;
+  magazineHash?: number;
+  magazineName?: string;
+  magazineIcon?: string;
+  masterworkHash?: number;
+  masterworkName?: string;
+  masterworkIcon?: string;
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -119,6 +128,14 @@ export async function POST(req: NextRequest) {
               allPerkHashes.add(s.plugHash);
             }
 
+            const barrelHash = socketData[id]?.sockets?.[1]?.plugHash;
+            const magazineHash = socketData[id]?.sockets?.[2]?.plugHash;
+            const masterworkHash = socketData[id]?.sockets?.[6]?.plugHash;
+
+            if (barrelHash) allPerkHashes.add(barrelHash);
+            if (magazineHash) allPerkHashes.add(magazineHash);
+            if (masterworkHash) allPerkHashes.add(masterworkHash);
+
             const stats: Record<string, number> = {};
             const rawStats = statData[id]?.stats ?? {};
             for (const [statHash, val] of Object.entries(rawStats)) {
@@ -132,6 +149,9 @@ export async function POST(req: NextRequest) {
               perkHashes,
               perks: [],
               perkIcons: {},
+              barrelHash,
+              magazineHash,
+              masterworkHash,
               stats,
               lightLevel: instanceData[id]?.primaryStat?.value ?? 0,
             };
@@ -165,6 +185,8 @@ export async function POST(req: NextRequest) {
       getPerkIcons([...allPerkHashes]),
       getWeaponDefinitions([...loadoutHashes]),
     ]);
+    const nameOf = (h: number) => perkInfoMap.get(h)?.name ?? "Unknown";
+    const iconOf = (h: number) => perkIconMap.get(h) ?? "";
 
     // Build the response: per slot -> { itemHash, damageType, baseStats, members: [...] }
     const slots: Record<string, { itemHash: number; damageType: string; baseStats: Record<string, number>; members: MemberRolls[] }> = {};
@@ -183,6 +205,12 @@ export async function POST(req: NextRequest) {
             perkHashes,
             perks: perkHashes.map((h) => perkInfoMap.get(h) as Perk),
             perkIcons,
+            barrelName: inst.barrelHash ? nameOf(inst.barrelHash) : undefined,
+            barrelIcon: inst.barrelHash ? iconOf(inst.barrelHash) : undefined,
+            magazineName: inst.magazineHash ? nameOf(inst.magazineHash) : undefined,
+            magazineIcon: inst.magazineHash ? iconOf(inst.magazineHash) : undefined,
+            masterworkName: inst.masterworkHash ? nameOf(inst.masterworkHash) : undefined,
+            masterworkIcon: inst.masterworkHash ? iconOf(inst.masterworkHash) : undefined,
           };
         });
         memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances, failed: m.failed });

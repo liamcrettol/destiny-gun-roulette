@@ -11,6 +11,15 @@ export interface RollInstance {
   perkHashes: number[];
   perks: Perk[];
   perkIcons: Record<number, string>;
+  barrelHash?: number;
+  barrelName?: string;
+  barrelIcon?: string;
+  magazineHash?: number;
+  magazineName?: string;
+  magazineIcon?: string;
+  masterworkHash?: number;
+  masterworkName?: string;
+  masterworkIcon?: string;
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -94,6 +103,20 @@ export default function RollDetails({
   // of stretching across the whole panel when only one player is loaded.
   const gridCols = { gridTemplateColumns: `5.5rem repeat(${members.length}, 15rem)`, width: "max-content", margin: "0 auto" };
 
+  // Helper to render socket icons
+  const renderSocketIcon = (hash: number | undefined, name: string | undefined, icon: string | undefined) => {
+    if (!hash || !icon) return null;
+    return (
+      <img
+        key={hash}
+        src={icon}
+        alt={name}
+        title={name}
+        className="w-8 h-8 rounded border border-bungie-blue/40 hover:border-bungie-blue cursor-help transition"
+      />
+    );
+  };
+
   return (
     <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
       <div className="px-4 py-2.5 border-b border-bungie-border flex items-center justify-between gap-2">
@@ -169,27 +192,49 @@ export default function RollDetails({
             return (
               <div key={`p-${m.userId}`} className="text-center px-0.5">
                 {inst ? (
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    {inst.perkHashes.length
-                      ? inst.perkHashes.map((hash, i) => {
-                          const perk = inst.perks[i];
-                          if (!perk) return null;
-                          const icon = inst.perkIcons[hash];
-                          return icon ? (
-                            <img
-                              key={`${hash}-${i}`}
-                              src={icon}
-                              alt={perk.name}
-                              title={perk.description || perk.name}
-                              className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
-                            />
-                          ) : (
-                            <span key={`${hash}-${i}`} title={perk.description || undefined} className={`text-[10px] leading-tight ${m.isMe ? theme.text : "text-gray-400"}`}>
-                              {perk.name}
-                            </span>
-                          );
-                        })
-                      : <span className="text-[10px] text-gray-500">—</span>}
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {inst.barrelIcon && (
+                      <img
+                        src={inst.barrelIcon}
+                        alt={inst.barrelName}
+                        title={inst.barrelName}
+                        className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
+                      />
+                    )}
+                    {inst.magazineIcon && (
+                      <img
+                        src={inst.magazineIcon}
+                        alt={inst.magazineName}
+                        title={inst.magazineName}
+                        className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
+                      />
+                    )}
+                    {inst.perkHashes.length > 0 ? (
+                      inst.perkHashes.map((hash, i) => {
+                        const icon = inst.perkIcons[hash];
+                        const perk = inst.perks[i];
+                        return icon ? (
+                          <img
+                            key={hash}
+                            src={icon}
+                            alt={perk?.name}
+                            title={perk?.name}
+                            className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
+                          />
+                        ) : null;
+                      })
+                    ) : null}
+                    {inst.masterworkIcon && (
+                      <img
+                        src={inst.masterworkIcon}
+                        alt={inst.masterworkName}
+                        title={inst.masterworkName}
+                        className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
+                      />
+                    )}
+                    {!inst.barrelIcon && !inst.magazineIcon && inst.perkHashes.length === 0 && !inst.masterworkIcon && (
+                      <span className="text-[11px] text-gray-500">no perk data</span>
+                    )}
                   </div>
                 ) : (
                   <p className="text-[10px] text-gray-600" title={m.failed ? "Couldn't read their inventory - they may need to allow inventory access in their Bungie.net privacy settings" : undefined}>
@@ -202,6 +247,26 @@ export default function RollDetails({
 
           {/* Divider */}
           <div className="col-span-full h-px bg-bungie-border/50 my-1" />
+
+          {/* Chosen roll: all sockets + perk-adjusted stats with deltas vs base */}
+          {myChosen && (
+            <>
+              <div className="text-gray-500 text-[10px] uppercase tracking-wide self-start pt-1">Your Roll</div>
+              <div className="col-span-full">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {renderSocketIcon(myChosen.barrelHash, myChosen.barrelName, myChosen.barrelIcon)}
+                  {renderSocketIcon(myChosen.magazineHash, myChosen.magazineName, myChosen.magazineIcon)}
+                  {myChosen.perkHashes.map((hash, i) => {
+                    const icon = myChosen.perkIcons[hash];
+                    const perk = myChosen.perks[i];
+                    return renderSocketIcon(hash, perk?.name, icon);
+                  })}
+                  {renderSocketIcon(myChosen.masterworkHash, myChosen.masterworkName, myChosen.masterworkIcon)}
+                </div>
+                <p className="text-gray-600 text-[10px] mt-1.5">Green/red = perk impact vs the weapon&apos;s base stats.</p>
+              </div>
+            </>
+          )}
 
           {/* Stat rows: value per member, team-best highlighted */}
           {statRows.map((s) => {
