@@ -13,6 +13,7 @@ import WeaponPool from "./WeaponPool";
 import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
 import { trimBungieName } from "@/lib/utils";
+import PlayerCard from "./PlayerCard";
 
 interface PlayerStat {
   userId: string;
@@ -729,12 +730,22 @@ export default function LobbyRoom({
   // selection so post-match stats can be collected. No separate "ready" step.
   const handleSelectCharacter = useCallback(async (characterId: string) => {
     setSelectedCharId(characterId);
-    await fetch("/api/lobby/ready", {
+    const char = characters.find((c) => c.characterId === characterId);
+    const res = await fetch("/api/lobby/ready", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lobbyId: lobby.id, characterId, isReady: true }),
+      body: JSON.stringify({
+        lobbyId: lobby.id,
+        characterId,
+        isReady: true,
+        emblemPath: char?.emblemPath,
+        emblemBackgroundPath: char?.emblemBackgroundPath,
+      }),
     });
-  }, [lobby.id]);
+    if (!res.ok) {
+      setSelectedCharId(null);
+    }
+  }, [lobby.id, characters]);
 
   // Auto-select the most recently played character once characters load,
   // but only if the player hasn't already picked one (e.g. from a previous join).
@@ -1300,12 +1311,7 @@ export default function LobbyRoom({
           </div>
           <div className="flex flex-wrap gap-3">
             {members.map((m) => (
-              <div key={m.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${m.is_captain ? "border-yellow-500 bg-yellow-500/10" : m.is_spectator ? "border-bungie-border bg-bungie-dark opacity-60" : "border-bungie-border bg-bungie-dark"}`}>
-                {m.is_captain && <span>👑</span>}
-                <span className={m.is_spectator ? "text-gray-500" : m.selected_character_id ? "text-green-400" : "text-gray-300"}>{trimBungieName(m.display_name)}</span>
-                {m.is_spectator && <span className="text-gray-500 text-xs">spectating</span>}
-                {!m.is_spectator && m.selected_character_id && <span className="text-green-500 text-xs" title="Guardian selected">✓</span>}
-              </div>
+              <PlayerCard key={m.id} member={m} />
             ))}
           </div>
           {charactersPicked < 2 && (

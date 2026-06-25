@@ -7,6 +7,8 @@ const schema = z.object({
   lobbyId: z.string().uuid(),
   characterId: z.string(),
   isReady: z.boolean(),
+  emblemPath: z.string().optional(),
+  emblemBackgroundPath: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -14,14 +16,18 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     const body = schema.parse(await req.json());
 
-    await adminSupabase
+    const { error: updateError } = await adminSupabase
       .from("lobby_members")
       .update({
         is_ready: body.isReady,
         selected_character_id: body.characterId,
+        emblem_path: body.emblemPath ?? null,
+        emblem_background_path: body.emblemBackgroundPath ?? null,
       })
       .eq("lobby_id", body.lobbyId)
       .eq("user_id", session.userId);
+
+    if (updateError) throw new Error(updateError.message);
 
     return NextResponse.json({ ok: true });
   } catch (err) {
