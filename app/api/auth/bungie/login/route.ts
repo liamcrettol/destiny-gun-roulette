@@ -11,9 +11,15 @@ export async function GET(req: NextRequest) {
     expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   });
 
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const redirectUri =
+    process.env.BUNGIE_REDIRECT_URI ||
+    `${baseUrl}/api/auth/bungie/callback`;
+
   const authUrl = new URL("https://www.bungie.net/en/OAuth/Authorize");
   authUrl.searchParams.set("client_id", process.env.BUNGIE_CLIENT_ID!);
   authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("state", state);
   // Do NOT add scope - Bungie rejects any scope parameter
   // reauth=true forces Bungie to show the account-picker even when already signed in

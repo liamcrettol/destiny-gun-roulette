@@ -58,7 +58,7 @@ The app does not store Bungie passwords. Authentication is handled through Bungi
 5. **Create a Bungie API application**
    - Go to https://www.bungie.net/en/Application
    - Create a new application
-   - Set the OAuth redirect URL to: `https://YOUR_NGROK_URL/api/auth/callback/bungie`
+   - Set the OAuth redirect URL to: `https://YOUR_NGROK_URL/api/auth/bungie/callback`
      - Replace `YOUR_NGROK_URL` with the ngrok URL from step 4
    - Save your Client ID and Client Secret
 
@@ -69,15 +69,22 @@ The app does not store Bungie passwords. Authentication is handled through Bungi
      NEXT_PUBLIC_BUNGIE_CLIENT_ID=YOUR_CLIENT_ID
      BUNGIE_CLIENT_SECRET=YOUR_CLIENT_SECRET
      ```
+   - Optionally, set `BUNGIE_REDIRECT_URI` if your redirect URL differs from the default:
+     ```
+     BUNGIE_REDIRECT_URI=https://YOUR_NGROK_URL/api/auth/bungie/callback
+     ```
+     If not set, it defaults to `{NEXTAUTH_URL}/api/auth/bungie/callback`
 
 7. **Test locally**
    - Visit `https://YOUR_NGROK_URL` in your browser
    - Sign in with your Bungie account using the OAuth redirect
 
-### Notes
-- The ngrok URL changes each restart. Update your Bungie app's redirect URL if ngrok restarts.
-- Keep both the dev server and ngrok running while testing.
-- Use `https://` (ngrok provides SSL automatically).
+### Configuration Notes
+
+- **BUNGIE_REDIRECT_URI**: Optional environment variable for the OAuth redirect URL. By default, it's constructed from `NEXTAUTH_URL`. Set this if you need a custom redirect path (e.g., when using ngrok with a custom domain or testing with different tunneling services).
+- **ngrok URL changes**: Each time ngrok restarts, you get a new URL. Update your Bungie app's redirect URL and `.env.local` if ngrok restarts.
+- **Keep both services running**: The dev server and ngrok must both be running for OAuth to work.
+- **Use https://**: ngrok provides SSL automatically; Bungie API requires HTTPS.
 
 ## Deployment URLs
 

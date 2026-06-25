@@ -4,6 +4,9 @@ import { encryptToken } from "@/lib/auth/encrypt";
 import { encode } from "@auth/core/jwt";
 
 const BASE_URL = process.env.NEXTAUTH_URL!;
+const BUNGIE_REDIRECT_URI =
+  process.env.BUNGIE_REDIRECT_URI ||
+  `${BASE_URL}/api/auth/bungie/callback`;
 
 function errRedirect(step: string, detail?: string) {
   const msg = detail ? `${step}: ${detail}` : step;
@@ -53,6 +56,7 @@ export async function GET(req: NextRequest) {
         code,
         client_id: process.env.BUNGIE_CLIENT_ID!,
         client_secret: process.env.BUNGIE_CLIENT_SECRET!,
+        redirect_uri: BUNGIE_REDIRECT_URI,
       }),
     });
     if (!tokenRes.ok) {
