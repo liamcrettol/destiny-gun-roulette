@@ -1236,12 +1236,6 @@ export default function LobbyRoom({
                 >
                   {captainLocked ? "🔒 Stay Captain" : "🔁 Auto-rotate"}
                 </button>
-                <button
-                  onClick={() => setShowWeaponBrowser((v) => !v)}
-                  className="text-xs px-2.5 py-1 rounded border border-bungie-border text-gray-400 hover:border-gray-400 transition"
-                >
-                  {showWeaponBrowser ? "Hide Weapon List" : "Show Weapon List"}
-                </button>
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
