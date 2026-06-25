@@ -14,6 +14,7 @@ import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
 import { trimBungieName } from "@/lib/utils";
 import PlayerCard from "./PlayerCard";
+import RollSettingsPopover from "./RollSettingsPopover";
 
 interface PlayerStat {
   userId: string;
@@ -279,6 +280,8 @@ export default function LobbyRoom({
   const [captainLocked, setCaptainLocked] = useState(lobby.captain_locked ?? false);
   const [showWeaponBrowser, setShowWeaponBrowser] = useState(true);
   const [showRollSettingsPopover, setShowRollSettingsPopover] = useState(false);
+  const [rollSettingsOpen, setRollSettingsOpen] = useState(false);
+  const [weaponPoolOpen, setWeaponPoolOpen] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const gearButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1394,178 +1397,99 @@ export default function LobbyRoom({
         </div>
 
 
-        {/* Captain controls */}
-        {isCaptain && (
-          <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-yellow-400 font-semibold">👑 {captainName ? `${captainName}'s Turn` : "Your Turn"}</h2>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleToggleCaptainLock}
-                  title={captainLocked ? "You stay captain every round — click to auto-rotate instead" : "Captain rotates each round — click to lock yourself in as captain"}
-                  className={`text-xs px-2.5 py-1 rounded border transition ${captainLocked ? "border-yellow-500 bg-yellow-500/20 text-yellow-300" : "border-bungie-border text-gray-400 hover:border-gray-400"}`}
-                >
-                  {captainLocked ? "🔒 Stay Captain" : "🔁 Auto-rotate"}
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={handleLoadIntersection} disabled={loadingAction !== null}
-                className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition">
-                {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
+        {/* Action row */}
+        {!isSpectator && roundId && (
+          <div className="relative flex items-center gap-3 flex-wrap">
+            {isCaptain && (
+              <button
+                onClick={() => handleRoll()}
+                disabled={loadingAction !== null || rerollExhausted || !intersection}
+                className="px-5 py-2.5 bg-bungie-blue hover:opacity-90 disabled:opacity-40 text-white font-bold rounded-full transition text-sm"
+              >
+                {loadingAction === "roll" ? "Rolling…" : "🎲 Roll All"}
               </button>
-              {intersection && (
-                <>
-                  <button onClick={() => handleRoll()} disabled={loadingAction !== null || rerollExhausted}
-                    className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition">
-                    {loadingAction === "roll" ? "Rolling..." : "🎲 Roll All"}
-                  </button>
-                  {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => (
-                    <button key={slot} onClick={() => handleRoll(slot)} disabled={loadingAction !== null || rerollExhausted}
-                      className="px-3 py-2 bg-bungie-surface border border-bungie-border rounded-lg text-xs text-gray-300 hover:border-gray-400 disabled:opacity-50 transition capitalize">
-                      Reroll {SLOT_LABELS[slot]}
-                    </button>
-                  ))}
-                </>
-              )}
-            </div>
-
-            {/* Roll settings: mode, reroll budget, type bans */}
-            {intersection && (
-              <div className="mt-3 rounded-lg border border-bungie-border bg-bungie-dark/40 p-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <label className="flex items-center gap-2 text-xs text-gray-400">
-                    Mode
-                    <select
-                      value={rollMode}
-                      onChange={(e) => setRollMode(e.target.value as typeof rollMode)}
-                      className="bg-bungie-surface border border-bungie-border rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-bungie-blue"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="chaos">Chaos</option>
-                      <option value="meta">Meta</option>
-                    </select>
-                  </label>
-
-                  <label className="flex items-center gap-2 text-xs text-gray-400">
-                    Rerolls / round
-                    <select
-                      value={rerollLimit === null ? "inf" : String(rerollLimit)}
-                      onChange={(e) => setRerollLimit(e.target.value === "inf" ? null : Number(e.target.value))}
-                      className="bg-bungie-surface border border-bungie-border rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-bungie-blue"
-                    >
-                      <option value="inf">Unlimited</option>
-                      <option value="3">3</option>
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                    </select>
-                    {rerollLimit !== null && (
-                      <span className={rerollExhausted ? "text-red-400" : "text-gray-300"}>
-                        {Math.max(0, rerollLimit - rerollsUsed)} left
-                      </span>
-                    )}
-                  </label>
-
-                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={noDupMode}
-                      onChange={(e) => setNoDupMode(e.target.checked)}
-                      className="accent-bungie-blue"
-                    />
-                    No duplicates
-                  </label>
-
-                  <button
-                    onClick={() => setShowRollSettings((v) => !v)}
-                    className="text-xs text-gray-400 hover:text-white transition"
-                  >
-                    {bannedTypes.size > 0 ? `Banned types (${bannedTypes.size})` : "Ban weapon types"} {showRollSettings ? "▲" : "▼"}
-                  </button>
-                </div>
-
-                {showRollSettings && (
-                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-bungie-border/60">
-                    {poolWeaponTypes.length === 0 && (
-                      <span className="text-xs text-gray-500">No weapons loaded yet.</span>
-                    )}
-                    {poolWeaponTypes.map((t) => {
-                      const banned = bannedTypes.has(t);
-                      return (
-                        <button
-                          key={t}
-                          onClick={() => setBannedTypes((prev) => {
-                            const n = new Set(prev);
-                            if (n.has(t)) n.delete(t); else n.add(t);
-                            return n;
-                          })}
-                          className={`text-xs px-2 py-1 rounded border transition ${
-                            banned
-                              ? "border-red-700 bg-red-900/30 text-red-300 line-through"
-                              : "border-bungie-border text-gray-300 hover:border-gray-400"
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                    {bannedTypes.size > 0 && (
-                      <button
-                        onClick={() => setBannedTypes(new Set())}
-                        className="text-xs px-2 py-1 rounded text-gray-500 hover:text-gray-300"
-                      >
-                        Clear bans
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
             )}
 
-            {intersection && (
-              <div className="mt-3">
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs text-gray-500">Slot mode:</span>
-                  {(["kinetic", "energy", "power"] as WeaponSlot[]).map((slot) => {
-                    const mode: SlotMode = lockedSlots.has(slot)
-                      ? "lock"
-                      : wildcardSlots.has(slot)
-                      ? "wildcard"
-                      : "normal";
-                    const cfg = SLOT_MODE_CONFIG[mode];
-                    return (
-                      <button
-                        key={slot}
-                        onClick={() => cycleSlotMode(slot)}
-                        title={`${SLOT_LABELS[slot]}: ${cfg.label}, click to cycle`}
-                        className={`px-2.5 py-1 rounded text-xs border transition flex items-center gap-1.5 ${cfg.cls}`}
-                      >
-                        <span>{cfg.icon}</span>
-                        <span className="font-medium">{SLOT_LABELS[slot]}</span>
-                        <span className="opacity-70">· {cfg.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  Click a slot to cycle: 🎲 Random → 🔒 Locked (keep on reroll) → 👤 Your own (skipped on apply)
-                </p>
-              </div>
+            {slots.some((s) => s.item_hash !== 0) && (
+              <button
+                onClick={handleApply}
+                disabled={!selectedCharId || loadingAction === "apply" || slots.length < 3}
+                className="px-5 py-2.5 bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white font-bold rounded-full transition text-sm"
+              >
+                {loadingAction === "apply" ? "Applying…" : "⚡ Apply"}
+              </button>
             )}
 
-            {intersectionError && <div className="mt-2 text-xs text-red-400 break-all">{intersectionError}</div>}
-            {effectiveIntersection && (
-              <div className="mt-2 text-xs text-gray-400">
-                Kinetic: {effectiveIntersection.kinetic.length} · Energy: {effectiveIntersection.energy.length} · Power: {effectiveIntersection.power.length}
-              </div>
+            {loadingAction === "apply" && (
+              <button
+                onClick={handleCancelApply}
+                className="px-3 py-2.5 border border-red-800 text-red-400 hover:border-red-600 rounded-full text-sm transition"
+              >
+                Cancel
+              </button>
+            )}
+
+            {isCaptain && intersection && (
+              <button
+                ref={gearButtonRef}
+                onClick={() => setShowRollSettingsPopover((v) => !v)}
+                className={`px-2.5 py-2.5 border rounded-full text-sm transition ${
+                  showRollSettingsPopover
+                    ? "border-bungie-blue/50 bg-bungie-blue/10 text-bungie-blue"
+                    : "border-bungie-border/40 text-gray-400 hover:border-gray-500"
+                }`}
+                aria-label="Roll settings"
+              >
+                ⚙️
+              </button>
+            )}
+
+            {intersectionError && (
+              <span className="text-xs text-red-400">{intersectionError}</span>
+            )}
+            {!intersection && isCaptain && loadingAction === "intersection" && (
+              <span className="text-xs text-gray-500 animate-pulse">Loading shared weapons…</span>
+            )}
+
+            {showRollSettingsPopover && isCaptain && (
+              <RollSettingsPopover
+                anchorRef={gearButtonRef}
+                onClose={() => setShowRollSettingsPopover(false)}
+                rollMode={rollMode}
+                onRollModeChange={setRollMode}
+                rerollLimit={rerollLimit}
+                onRerollLimitChange={setRerollLimit}
+                rerollsUsed={rerollsUsed}
+                noDupMode={noDupMode}
+                onNoDupChange={setNoDupMode}
+                bannedTypes={bannedTypes}
+                onBannedTypesChange={setBannedTypes}
+                poolWeaponTypes={poolWeaponTypes}
+              />
             )}
           </div>
         )}
 
         {slots.length > 0 && (
-          <LoadoutQueue slots={slots} weaponDetails={weaponDetails} instancePerks={instancePerks}
-            collectionHashes={collectionHashes} onApply={handleApply} animKindRef={animKindRef}
-            onCancelApply={handleCancelApply} selectedCharId={selectedCharId} loading={loadingAction === "apply"} />
+          <div className={`relative transition-all duration-500 ${loadingAction === "roll" ? "after:absolute after:inset-0 after:rounded-xl after:bg-bungie-blue/5 after:pointer-events-none" : ""}`}>
+            <LoadoutQueue
+              slots={slots}
+              weaponDetails={weaponDetails}
+              instancePerks={instancePerks}
+              collectionHashes={collectionHashes}
+              onApply={handleApply}
+              animKindRef={animKindRef}
+              onCancelApply={handleCancelApply}
+              selectedCharId={selectedCharId}
+              loading={loadingAction === "apply"}
+              isCaptain={isCaptain}
+              lockedSlots={lockedSlots}
+              wildcardSlots={wildcardSlots}
+              onCycleSlotMode={cycleSlotMode}
+              onRerollSlot={(slot) => handleRoll(slot)}
+              rerollExhausted={rerollExhausted}
+            />
+          </div>
         )}
 
         {slots.some((s) => s.item_hash !== 0) && (
@@ -1585,12 +1509,84 @@ export default function LobbyRoom({
           <ApplyStatus results={applyResults} onClear={() => setApplyResults([])} />
         )}
 
-        {showPoolPanel && (
-          <div className="xl:hidden">
-            {poolHeader(false)}
-            {intersection ? weaponBrowser : poolLoadButton(false)}
-          </div>
-        )}
+        {/* Drawers */}
+        <div className="space-y-2">
+          {/* Roll Settings drawer (captain only) */}
+          {isCaptain && intersection && (
+            <div className="border border-bungie-border/40 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setRollSettingsOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition"
+              >
+                <span>⚙️ Roll Settings{bannedTypes.size > 0 ? ` · ${bannedTypes.size} banned` : ""}</span>
+                <span className="text-xs">{rollSettingsOpen ? "▲" : "▼"}</span>
+              </button>
+              {rollSettingsOpen && (
+                <div className="px-4 pb-4 border-t border-bungie-border/40">
+                  <RollSettingsPopover
+                    anchorRef={{ current: null }}
+                    onClose={() => {}}
+                    rollMode={rollMode}
+                    onRollModeChange={setRollMode}
+                    rerollLimit={rerollLimit}
+                    onRerollLimitChange={setRerollLimit}
+                    rerollsUsed={rerollsUsed}
+                    noDupMode={noDupMode}
+                    onNoDupChange={setNoDupMode}
+                    bannedTypes={bannedTypes}
+                    onBannedTypesChange={setBannedTypes}
+                    poolWeaponTypes={poolWeaponTypes}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Weapon Pool drawer */}
+          {!isSpectator && (
+            <div className="border border-bungie-border/40 rounded-xl overflow-hidden">
+              <button
+                onClick={() => {
+                  if (!intersection && isCaptain) handleLoadIntersection();
+                  setWeaponPoolOpen((v) => !v);
+                }}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition"
+              >
+                <span>
+                  🔫 Weapon Pool
+                  {effectiveIntersection
+                    ? ` · ${effectiveIntersection.kinetic.length + effectiveIntersection.energy.length + effectiveIntersection.power.length} shared`
+                    : !isCaptain
+                    ? ""
+                    : " · tap to load"}
+                </span>
+                <span className="text-xs">{weaponPoolOpen ? "▲" : "▼"}</span>
+              </button>
+              {weaponPoolOpen && (
+                <div className="border-t border-bungie-border/40">
+                  {intersection ? (
+                    weaponBrowser ?? <p className="p-4 text-sm text-gray-500">Browse disabled.</p>
+                  ) : (
+                    <div className="p-4">
+                      {!isCaptain ? (
+                        <button
+                          onClick={handleLoadIntersection}
+                          disabled={loadingAction !== null}
+                          className="w-full px-4 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
+                        >
+                          {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
+                        </button>
+                      ) : (
+                        <p className="text-sm text-gray-500">Loading shared weapons…</p>
+                      )}
+                      {intersectionError && <p className="mt-2 text-xs text-red-400">{intersectionError}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {sidebar}
