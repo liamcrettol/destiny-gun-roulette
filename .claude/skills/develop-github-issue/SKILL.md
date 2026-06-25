@@ -176,6 +176,12 @@ gh pr create \
 
 - Use `superpowers:requesting-code-review` for review
 - Merge when approved — GitHub automatically closes the issue
+- After merging, swap the "doing" label for "completed" on the issue:
+
+```bash
+gh label create "completed" --color "0e8a16" --description "Work merged and complete" 2>/dev/null || true
+gh issue edit <issue-number> --remove-label "doing" --add-label "completed"
+```
 
 ## Example Usage
 
