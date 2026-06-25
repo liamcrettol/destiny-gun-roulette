@@ -24,7 +24,7 @@ export default function PlayerCard({ member }: Props) {
 
   return (
     <div
-      className={`relative flex items-center gap-0 rounded-lg overflow-hidden border h-14 min-w-[200px] max-w-[280px]
+      className={`relative flex items-center gap-0 rounded-lg overflow-hidden border h-16 min-w-[260px] max-w-[340px]
         ${member.is_captain
           ? "border-yellow-500/60"
           : member.is_spectator
@@ -54,7 +54,7 @@ export default function PlayerCard({ member }: Props) {
       )}
 
       {/* Emblem icon — left square */}
-      <div className="relative shrink-0 w-14 h-14">
+      <div className="relative shrink-0 w-16 h-16">
         {iconUrl ? (
           <img
             src={iconUrl}
