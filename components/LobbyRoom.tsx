@@ -274,6 +274,7 @@ export default function LobbyRoom({
 
   // Roll preferences (persisted in localStorage, captain-controlled)
   const [rollMode, setRollMode] = useState<"normal" | "chaos" | "meta">("normal");
+  const [noDupMode, setNoDupMode] = useState(false);
   const [bannedTypes, setBannedTypes] = useState<Set<string>>(new Set());
   const [rerollLimit, setRerollLimit] = useState<number | null>(null); // null = unlimited
   const [rerollsUsed, setRerollsUsed] = useState(0);
@@ -815,10 +816,11 @@ export default function LobbyRoom({
         avoid,
         wildcardSlots: Array.from(nextWildcards),
         mode: rollMode,
+        nodup: noDupMode || undefined,
       }),
     });
     setLoadingAction(null);
-  }, [intersection, effectiveIntersection, roundId, lobby.id, slots, weaponDetails, rollMode]);
+  }, [intersection, effectiveIntersection, roundId, lobby.id, slots, weaponDetails, rollMode, noDupMode]);
 
   // Cycle a slot through Random → 🔒 Locked → 👤 Your own → Random.
   // Locked = keep this shared weapon on Roll All. Your own = skip slot on apply
@@ -881,11 +883,11 @@ export default function LobbyRoom({
     await fetch("/api/roulette/roll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lobbyId: lobby.id, roundId, intersection: effectiveIntersection ?? intersection, weaponDetails, rerollSlot, keepSlots, avoid, wildcardSlots: Array.from(effectiveWildcards), mode: rollMode }),
+      body: JSON.stringify({ lobbyId: lobby.id, roundId, intersection: effectiveIntersection ?? intersection, weaponDetails, rerollSlot, keepSlots, avoid, wildcardSlots: Array.from(effectiveWildcards), mode: rollMode, nodup: noDupMode || undefined }),
     });
     setRerollsUsed((n) => n + 1);
     setLoadingAction(null);
-  }, [intersection, effectiveIntersection, roundId, lobby.id, slots, weaponDetails, lockedSlots, wildcardSlots, rollMode, rerollExhausted]);
+  }, [intersection, effectiveIntersection, roundId, lobby.id, slots, weaponDetails, lockedSlots, wildcardSlots, rollMode, noDupMode, rerollExhausted]);
 
   const handleApply = useCallback(async () => {
     if (!selectedCharId || !roundId) return;
@@ -1309,6 +1311,16 @@ export default function LobbyRoom({
                         {Math.max(0, rerollLimit - rerollsUsed)} left
                       </span>
                     )}
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={noDupMode}
+                      onChange={(e) => setNoDupMode(e.target.checked)}
+                      className="accent-bungie-blue"
+                    />
+                    No duplicates
                   </label>
 
                   <button
