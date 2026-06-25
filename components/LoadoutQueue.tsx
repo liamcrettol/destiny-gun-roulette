@@ -234,7 +234,7 @@ export default function LoadoutQueue({
                 )}
 
                 {isWildcard ? (
-                  <div className="w-full h-full flex items-center justify-center text-2xl opacity-40 grayscale">
+                  <div className="w-full h-full flex items-center justify-center text-2xl opacity-40 grayscale animate-pulse">
                     👤
                   </div>
                 ) : slot ? (
