@@ -126,6 +126,24 @@ function findLegendaryReplacement(
   return candidates.sort((a, b) => a.lightLevel - b.lightLevel)[0] ?? null;
 }
 
+function findLowestLightWeapons(
+  characterId: string,
+  roster: RawWeapon[],
+  count: number,
+  excludeInstanceIds: Set<string> = new Set()
+): RawWeapon[] {
+  return roster
+    .filter(
+      (w) =>
+        w.location === "character" &&
+        w.characterId === characterId &&
+        !w.isEquipped &&
+        !excludeInstanceIds.has(w.itemInstanceId)
+    )
+    .sort((a, b) => a.lightLevel - b.lightLevel)
+    .slice(0, count);
+}
+
 function isNoRoomError(err: unknown): boolean {
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
   return msg.includes("1642") || msg.includes("no room") || msg.includes("destinationfull");
