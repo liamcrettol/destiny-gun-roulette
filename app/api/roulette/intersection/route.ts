@@ -6,6 +6,7 @@ import {
   getPerkNames,
   getPerkIcons,
   flushDefinitionCache,
+  getWeaponGroupHashes,
 } from "@/lib/bungie/definitions";
 import { bungieGet } from "@/lib/bungie/client";
 import { z } from "zod";
@@ -53,6 +54,33 @@ interface MemberData {
 function asAnyArray(v: unknown): any[] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return Array.isArray(v) ? (v as any[]) : [];
+}
+
+/**
+ * Groups weapon hashes into variant groups (re-releases, Adept, craftable variants).
+ * For each hash, returns all variants including itself.
+ * Deduplicates across all input hashes.
+ */
+function buildVariantGroups(
+  hashes: Iterable<number>
+): Map<number, Set<number>> {
+  const variantGroups = new Map<number, Set<number>>();
+  const seen = new Set<number>();
+
+  for (const hash of hashes) {
+    if (seen.has(hash)) continue;
+    const variants = getWeaponGroupHashes(hash);
+    const variantSet = new Set(variants);
+    for (const v of variants) {
+      if (!seen.has(v)) {
+        variantSet.forEach((vv) => seen.add(vv));
+        // All variants in this group map to the same set
+        variantGroups.set(v, variantSet);
+      }
+    }
+  }
+
+  return variantGroups;
 }
 
 export async function POST(req: NextRequest) {
