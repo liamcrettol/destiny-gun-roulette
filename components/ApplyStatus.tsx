@@ -81,7 +81,7 @@ export default function ApplyStatus({
                 {r.weapon_icon && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`https://www.bungie.net${r.weapon_icon}`}
+                    src={r.weapon_icon}
                     alt=""
                     className="w-[30px] h-[30px] rounded border border-bungie-border flex-shrink-0"
                   />
