@@ -110,12 +110,12 @@ function SessionTotalsTable({ totals }: { totals: SessionTotal[] }) {
         <tbody className="divide-y divide-bungie-border/40">
           {sorted.map((s, i) => (
             <tr key={s.userId} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
-              <td className="py-2 pr-4 font-medium">{i === 0 ? "👑 " : ""}{s.displayName}</td>
-              <td className="py-2 pr-3 text-right">{s.kills}</td>
-              <td className="py-2 pr-3 text-right">{s.assists}</td>
-              <td className="py-2 pr-3 text-right">{s.deaths}</td>
-              <td className="py-2 pr-3 text-right">{(s.deaths > 0 ? s.kills / s.deaths : s.kills).toFixed(2)}</td>
-              <td className="py-2 text-right text-gray-500">{s.games}</td>
+              <td className="py-1.5 pr-4 font-medium">{i === 0 ? "👑 " : ""}{s.displayName}</td>
+              <td className="py-1.5 pr-3 text-right">{s.kills}</td>
+              <td className="py-1.5 pr-3 text-right">{s.assists}</td>
+              <td className="py-1.5 pr-3 text-right">{s.deaths}</td>
+              <td className="py-1.5 pr-3 text-right">{(s.deaths > 0 ? s.kills / s.deaths : s.kills).toFixed(2)}</td>
+              <td className="py-1.5 text-right text-gray-500">{s.games}</td>
             </tr>
           ))}
         </tbody>
@@ -143,11 +143,11 @@ function StatsTable({ stats }: { stats: PlayerStat[] }) {
         <tbody className="divide-y divide-bungie-border/40">
           {sorted.map((s, i) => (
             <tr key={s.userId} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
-              <td className="px-3 py-2 font-medium">
+              <td className="px-3 py-1.5 font-medium">
                 {i === 0 ? "👑 " : ""}{trimBungieName(s.displayName)}
               </td>
               {hasWon && (
-                <td className="px-2 py-2 text-center">
+                <td className="px-2 py-1.5 text-center">
                   {s.won === true
                     ? <span className="text-[10px] font-bold text-green-400 bg-green-400/10 border border-green-400/30 rounded px-1.5 py-0.5">W</span>
                     : s.won === false
@@ -155,10 +155,10 @@ function StatsTable({ stats }: { stats: PlayerStat[] }) {
                     : <span className="text-gray-500 text-xs">—</span>}
                 </td>
               )}
-              <td className="px-2 py-2 text-right tabular-nums">{s.kills}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{s.deaths}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{s.assists}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-gray-400">{s.kd.toFixed(2)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{s.kills}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{s.deaths}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{s.assists}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-gray-400">{s.kd.toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
@@ -1208,9 +1208,26 @@ export default function LobbyRoom({
         </div>
 
         {/* Stats panel: Session / History / Leaderboard tabs */}
-        <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
+        <div className="bg-bungie-surface border border-bungie-border/40 rounded-xl overflow-hidden">
+          {/* Post-game dismissible banner */}
+          {lastGameStats && lastGameStats.length > 0 && (() => {
+            const top = [...lastGameStats].sort((a, b) => b.kills - a.kills)[0];
+            const result = lastGameStats.find((s) => s.won != null)?.won ?? null;
+            return (
+              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-bungie-border/40 bg-green-900/10">
+                <span className="text-xs font-semibold text-green-400">
+                  {result === true ? "W" : result === false ? "L" : "—"}
+                </span>
+                <span className="text-xs text-gray-300 flex-1 truncate">
+                  👑 {trimBungieName(top.displayName)} · {top.kills}K / {top.deaths}D
+                </span>
+                <button onClick={() => setLastGameStats(null)} className="text-gray-500 hover:text-gray-300 text-xs transition">✕</button>
+              </div>
+            );
+          })()}
+
           {/* Tab bar */}
-          <div className="flex border-b border-bungie-border">
+          <div className="flex border-b border-bungie-border/40">
             {(["session", "history", "leaderboard"] as const).map((tab) => (
               <button
                 key={tab}
@@ -1375,24 +1392,6 @@ export default function LobbyRoom({
                 </div>
               )}
             </div>
-          )}
-        </div>
-
-        {/* Members */}
-        <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-white font-semibold">Fireteam ({members.length})</h2>
-            {captainName && <span className="text-xs text-yellow-400">👑 {captainName}&apos;s turn</span>}
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {members.map((m) => (
-              <PlayerCard key={m.id} member={m} />
-            ))}
-          </div>
-          {charactersPicked < 2 && (
-            <p className="mt-3 text-xs text-amber-400/90">
-              ⚠ Stats won&apos;t track until at least 2 players pick a guardian ({charactersPicked}/2).
-            </p>
           )}
         </div>
 
