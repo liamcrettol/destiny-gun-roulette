@@ -193,66 +193,6 @@ export default function RollDetails({
             );
           })}
 
-          {/* Perks row */}
-          <div className="text-gray-500 text-[10px] uppercase tracking-wide self-start pt-1">Perks</div>
-          {members.map((m) => {
-            const inst = shownFor(m);
-            return (
-              <div key={`p-${m.userId}`} className="text-center px-0.5">
-                {inst ? (
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {inst.barrelIcon && (
-                      <img
-                        src={inst.barrelIcon}
-                        alt={inst.barrelName}
-                        title={inst.barrelName}
-                        className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
-                      />
-                    )}
-                    {inst.magazineIcon && (
-                      <img
-                        src={inst.magazineIcon}
-                        alt={inst.magazineName}
-                        title={inst.magazineName}
-                        className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
-                      />
-                    )}
-                    {inst.perkHashes.length > 0 ? (
-                      inst.perkHashes.map((hash, i) => {
-                        const icon = inst.perkIcons[hash];
-                        const perk = inst.perks[i];
-                        return icon ? (
-                          <img
-                            key={hash}
-                            src={icon}
-                            alt={perk?.name}
-                            title={perk?.description ? `${perk.name} — ${perk.description}` : perk?.name}
-                            className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
-                          />
-                        ) : null;
-                      })
-                    ) : null}
-                    {inst.masterworkIcon && (
-                      <img
-                        src={inst.masterworkIcon}
-                        alt={inst.masterworkName}
-                        title={inst.masterworkName}
-                        className="w-6 h-6 rounded border border-bungie-border/40 hover:border-bungie-blue/60 cursor-help transition"
-                      />
-                    )}
-                    {!inst.barrelIcon && !inst.magazineIcon && inst.perkHashes.length === 0 && !inst.masterworkIcon && (
-                      <span className="text-[11px] text-gray-500">no perk data</span>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-gray-600" title={m.failed ? "Couldn't read their inventory - they may need to allow inventory access in their Bungie.net privacy settings" : undefined}>
-                    {m.failed ? "couldn't load" : "doesn't own"}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-
           {/* Divider */}
           <div className="col-span-full h-px bg-bungie-border/50 my-1" />
 
