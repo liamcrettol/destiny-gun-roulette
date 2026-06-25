@@ -3,6 +3,7 @@ import type { RawWeapon } from "../rawInventory";
 import * as clientModule from "../client";
 
 jest.mock("../client");
+jest.mock("../definitions");
 
 describe("isInventoryFull", () => {
   const mockWeapons = (count: number, location: "character" | "vault" = "character"): RawWeapon[] => {
@@ -307,5 +308,90 @@ describe("loadout item exclusion (integration)", () => {
 
     // Should return empty (no available weapon to vault)
     expect(result).toEqual([]);
+  });
+});
+
+import { applyWeapons } from "../equip";
+import { getWeaponDefinitions } from "../definitions";
+
+describe("applyWeapons result enrichment", () => {
+  const HASH = 5001;
+  const ICON = "/common/destiny2_content/icons/riptide.jpg";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getWeaponDefinitions as jest.Mock).mockResolvedValue(
+      new Map([
+        [
+          HASH,
+          {
+            itemHash: HASH,
+            name: "Riptide",
+            icon: ICON,
+            weaponType: "Fusion Rifle",
+            ammoType: "Special",
+            damageType: "Stasis",
+            tierName: "Legendary",
+            tierType: 5,
+            flavorText: "",
+            defaultBucketHash: 0,
+            stats: {},
+            intrinsicPerk: null,
+          },
+        ],
+      ])
+    );
+  });
+
+  it("attaches weapon_name and weapon_icon on a successful equip", async () => {
+    (clientModule.bungiePost as jest.Mock).mockResolvedValue({
+      equipResults: [{ itemInstanceId: "inst-1", equipStatus: 1 }],
+    });
+
+    const weapons = [
+      {
+        itemHash: HASH,
+        itemInstanceId: "inst-1",
+        slot: "energy" as const,
+        location: "character" as const,
+        characterId: "char-1",
+      },
+    ];
+
+    const results = await applyWeapons(weapons, "char-1", 2, "token", "u1", "Guardian#1234", []);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(true);
+    expect(results[0].weapon_name).toBe("Riptide");
+    expect(results[0].weapon_icon).toBe(ICON);
+  });
+
+  it("keeps friendly error and captures raw error_detail on a no-room transfer failure", async () => {
+    (clientModule.bungiePost as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("TransferItem")) {
+        return Promise.reject(new Error("Bungie code 1642 DestinationFull"));
+      }
+      return Promise.resolve({ equipResults: [] });
+    });
+
+    // location "vault" forces a transfer; empty roster means makeRoom finds no spare and gives up.
+    const weapons = [
+      {
+        itemHash: HASH,
+        itemInstanceId: "inst-1",
+        slot: "energy" as const,
+        location: "vault" as const,
+      },
+    ];
+
+    const results = await applyWeapons(weapons, "char-1", 2, "token", "u1", "Guardian#1234", []);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(false);
+    expect(results[0].error).toBe(
+      "Inventory full and no spare weapon to move — clear a slot, then Apply again"
+    );
+    expect(results[0].error_detail).toBe("Bungie code 1642 DestinationFull");
+    expect(results[0].weapon_name).toBe("Riptide");
   });
 });

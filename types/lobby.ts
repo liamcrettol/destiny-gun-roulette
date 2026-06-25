@@ -66,7 +66,11 @@ export interface ApplyResult {
   slot: WeaponSlot;
   item_hash: number;
   success: boolean;
-  error?: string;
+  error?: string; // concise, user-facing message (shown when a failed row is expanded)
+  weapon_name?: string; // weapon involved in this transaction
+  weapon_icon?: string; // Bungie icon path, rendered as https://www.bungie.net${weapon_icon}
+  error_detail?: string; // raw underlying technical error (shown under "Detail" when expanded)
+  kind?: "vault"; // marks a vault-clear ("made room") row, which has no real weapon slot
 }
 
 export interface GameSession {
