@@ -7,6 +7,8 @@ const schema = z.object({
   lobbyId: z.string().uuid(),
   characterId: z.string(),
   isReady: z.boolean(),
+  emblemPath: z.string().optional(),
+  emblemBackgroundPath: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,6 +21,8 @@ export async function POST(req: NextRequest) {
       .update({
         is_ready: body.isReady,
         selected_character_id: body.characterId,
+        emblem_path: body.emblemPath ?? null,
+        emblem_background_path: body.emblemBackgroundPath ?? null,
       })
       .eq("lobby_id", body.lobbyId)
       .eq("user_id", session.userId);
