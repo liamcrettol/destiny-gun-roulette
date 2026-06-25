@@ -1,4 +1,4 @@
-import { isInventoryFull, findLastWeapon, ensureInventorySpace } from "../equip";
+import { isInventoryFull, findLastWeapon, ensureInventorySpace, calculateVaultNeeded } from "../equip";
 import type { RawWeapon } from "../rawInventory";
 import * as clientModule from "../client";
 
@@ -308,6 +308,55 @@ describe("loadout item exclusion (integration)", () => {
 
     // Should return empty (no available weapon to vault)
     expect(result).toEqual([]);
+  });
+});
+
+describe("calculateVaultNeeded", () => {
+  const mockWeapons = (charCount: number, equipped: number = 3): RawWeapon[] => {
+    const allWeapons: RawWeapon[] = [];
+    for (let i = 0; i < charCount; i++) {
+      allWeapons.push({
+        itemHash: 1000 + i,
+        itemInstanceId: `instance-${i}`,
+        slot: (["kinetic", "energy", "power"][i % 3]) as any,
+        location: "character",
+        characterId: "char-1",
+        isEquipped: i < equipped,
+        lightLevel: 750 - i,
+        tierType: 5,
+      });
+    }
+    return allWeapons;
+  };
+
+  it("returns 0 when inventory has space", () => {
+    const weapons = mockWeapons(7, 3);
+    const needed = calculateVaultNeeded("char-1", weapons, 1);
+    expect(needed).toBe(0);
+  });
+
+  it("returns needed count when inventory is full", () => {
+    const weapons = mockWeapons(9, 3);
+    const needed = calculateVaultNeeded("char-1", weapons, 6);
+    expect(needed).toBe(3);
+  });
+
+  it("respects safety threshold (never vault more than 50% of unequipped)", () => {
+    const weapons = mockWeapons(9, 3);
+    const needed = calculateVaultNeeded("char-1", weapons, 8);
+    expect(needed).toBe(3);
+  });
+
+  it("returns 0 when loadout has weapons already on character", () => {
+    const weapons = mockWeapons(9, 3);
+    const needed = calculateVaultNeeded("char-1", weapons, 3, new Set(["instance-0", "instance-1", "instance-2"]));
+    expect(needed).toBe(0);
+  });
+
+  it("returns 0 when no weapons to vault available", () => {
+    const weapons = mockWeapons(9, 9);
+    const needed = calculateVaultNeeded("char-1", weapons, 3);
+    expect(needed).toBe(0);
   });
 });
 

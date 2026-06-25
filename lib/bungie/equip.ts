@@ -47,6 +47,49 @@ export function findLowestLightWeapons(
   return candidates.sort((a, b) => a.lightLevel - b.lightLevel).slice(0, count);
 }
 
+const SAFETY_VAULT_THRESHOLD = 0.5; // Never vault more than 50% of unequipped weapons
+
+export function calculateVaultNeeded(
+  characterId: string,
+  roster: RawWeapon[],
+  incomingWeaponCount: number,
+  alreadyOnCharacter: Set<string> = new Set()
+): number {
+  const characterWeapons = roster.filter(
+    (w) => w.location === "character" && w.characterId === characterId
+  );
+
+  const unequippedWeapons = characterWeapons.filter((w) => !w.isEquipped);
+  const equippedWeapons = characterWeapons.filter((w) => w.isEquipped);
+
+  // How many of the incoming weapons are already on this character?
+  const incomingOnCharacter = roster.filter(
+    (w) =>
+      w.location === "character" &&
+      w.characterId === characterId &&
+      alreadyOnCharacter.has(w.itemInstanceId)
+  ).length;
+
+  // How many new weapons are coming from outside?
+  const incomingFromOutside = incomingWeaponCount - incomingOnCharacter;
+
+  if (incomingFromOutside <= 0) return 0;
+
+  // Current capacity: equipped + unequipped
+  // After adding incoming: equipped + unequipped + incoming
+  // Max allowed: 9
+  // So we need to vault: (equipped + unequipped + incoming) - 9
+  const currentTotal = equippedWeapons.length + unequippedWeapons.length;
+  const afterAdding = currentTotal + incomingFromOutside;
+  const basicNeed = Math.max(0, afterAdding - INVENTORY_SLOT_LIMIT);
+
+  // Apply safety threshold: never vault more than 50% of unequipped
+  const maxSafeVault = Math.floor(unequippedWeapons.length * SAFETY_VAULT_THRESHOLD);
+  const capped = Math.min(basicNeed, maxSafeVault);
+
+  return Math.max(0, capped);
+}
+
 const EXOTIC_TIER_TYPE = 6;
 const LEGENDARY_TIER_TYPE = 5;
 
