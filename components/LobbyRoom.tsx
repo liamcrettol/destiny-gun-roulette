@@ -8,7 +8,7 @@ import type { DestinyCharacter } from "@/types/bungie";
 import type { WeaponSlot } from "@/types/bungie";
 import LoadoutQueue from "./LoadoutQueue";
 import ApplyStatus from "./ApplyStatus";
-import SignOutButton from "./SignOutButton";
+import { signOut } from "next-auth/react";
 import WeaponPool from "./WeaponPool";
 import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
@@ -1004,26 +1004,24 @@ export default function LobbyRoom({
           <div>
             <h1 className="text-2xl font-bold text-white">Lobby</h1>
             <div className="text-gray-400 text-sm flex items-center gap-2 flex-wrap mt-0.5">
-              <span>
-                Code: <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
-              </span>
               <button
                 onClick={copyCode}
-                className="text-xs px-2 py-0.5 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition"
+                title="Copy lobby code"
+                className="font-mono text-bungie-blue font-bold tracking-widest hover:opacity-75 transition"
               >
-                {copied ? "✓ Copied" : "Copy code"}
+                {copied ? "✓" : lobby.code}
               </button>
               <button
                 onClick={copyLink}
                 className="text-xs px-2 py-0.5 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition"
               >
-                {copiedLink ? "✓ Link copied" : "Copy invite link"}
+                {copiedLink ? "✓ Copied" : "Invite"}
               </button>
               <button
                 onClick={copyWatchLink}
                 className="text-xs px-2 py-0.5 rounded border border-bungie-border text-gray-300 hover:border-gray-400 transition"
               >
-                {copiedWatch ? "✓ Spectator copied" : "Copy spectator link"}
+                {copiedWatch ? "✓ Copied" : "Watch link"}
               </button>
             </div>
           </div>
@@ -1049,7 +1047,12 @@ export default function LobbyRoom({
             <button onClick={handleLeave} className="px-3 py-1.5 text-sm text-gray-400 border border-bungie-border rounded-lg hover:text-red-400 hover:border-red-800 transition">
               Leave
             </button>
-            <SignOutButton />
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="text-sm text-gray-500 hover:text-gray-300 transition"
+            >
+              Sign out
+            </button>
           </div>
         </div>
 
