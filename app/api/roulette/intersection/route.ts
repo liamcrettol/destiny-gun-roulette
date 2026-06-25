@@ -72,8 +72,11 @@ function buildVariantGroups(
     const variants = getWeaponGroupHashes(hash);
     const variantSet = new Set(variants);
     for (const v of variants) {
-      seen.add(v);  // Mark ALL variants as seen
-      variantGroups.set(v, variantSet);
+      if (!seen.has(v)) {
+        variantSet.forEach((vv) => seen.add(vv));
+        // All variants in this group map to the same set
+        variantGroups.set(v, variantSet);
+      }
     }
   }
 
@@ -267,57 +270,19 @@ export async function POST(req: NextRequest) {
       memberCollectibleMap.set(userId, data.collectibles);
     }
 
-    // ── Phase 4: Inventory intersection with variant pooling ─────────────────
+    // ── Phase 4: Inventory intersection ──────────────────────────────────────
 
-    // Collect all weapon hashes per slot from all members
-    const allHashesBySlot: Record<WeaponSlot, Set<number>> = {
-      kinetic: new Set(),
-      energy: new Set(),
-      power: new Set(),
-    };
-    for (const sets of memberSlotSets.values()) {
-      for (const slot of slots) {
-        sets[slot].forEach((h) => allHashesBySlot[slot].add(h));
-      }
-    }
-
-    // Build variant groups from all hashes
-    const allHashesFlat = new Set<number>();
-    for (const slot of slots) {
-      allHashesBySlot[slot].forEach((h) => allHashesFlat.add(h));
-    }
-    const variantGroups = buildVariantGroups(allHashesFlat);
-
-    // For each variant group, check if every member owns at least one variant
     const intersection: Record<WeaponSlot, Set<number>> = {
       kinetic: new Set(),
       energy: new Set(),
       power: new Set(),
     };
-
-    const processedGroups = new Set<Set<number>>();
-
     for (const slot of slots) {
       const memberSets = [...memberSlotSets.values()].map((s) => s[slot]);
       if (memberSets.length === 0) continue;
-
-      for (const hash of allHashesBySlot[slot]) {
-        const variantSet = variantGroups.get(hash);
-        if (!variantSet || processedGroups.has(variantSet)) continue;
-
-        // Check if every member owns at least one variant of this weapon
-        const allMembersHaveVariant = memberSets.every((memberSet) => {
-          for (const variant of variantSet) {
-            if (memberSet.has(variant)) return true;
-          }
-          return false;
-        });
-
-        if (allMembersHaveVariant) {
-          // Use the hash itself as the representative
-          intersection[slot].add(hash);
-          processedGroups.add(variantSet);
-        }
+      const [first, ...rest] = memberSets;
+      for (const hash of first) {
+        if (rest.every((s) => s.has(hash))) intersection[slot].add(hash);
       }
     }
 
