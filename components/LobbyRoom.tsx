@@ -278,6 +278,8 @@ export default function LobbyRoom({
   // Captain-only toggles
   const [captainLocked, setCaptainLocked] = useState(lobby.captain_locked ?? false);
   const [showWeaponBrowser, setShowWeaponBrowser] = useState(true);
+  const [showRollSettingsPopover, setShowRollSettingsPopover] = useState(false);
+  const gearButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Roll preferences (persisted in localStorage, captain-controlled)
   const [rollMode, setRollMode] = useState<"normal" | "chaos" | "meta">("normal");
@@ -991,6 +993,56 @@ export default function LobbyRoom({
 
   // The shared weapon pool is viewable by every player. The captain can select
   // weapons into the loadout; everyone else gets a read-only browse view.
+  const CLASS_ICONS: Record<number, string> = { 0: "🛡️", 1: "🏹", 2: "🔮" };
+
+  const sidebar = (
+    <aside className="hidden xl:flex xl:flex-col w-36 shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] gap-0 bg-bungie-surface border border-bungie-border/40 rounded-xl overflow-hidden">
+      {/* Fireteam */}
+      <div className="px-3 pt-3 pb-2">
+        <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Fireteam</p>
+        <div className="space-y-0.5">
+          {members.map((m) => (
+            <PlayerCard key={m.id} member={m} variant="sidebar" />
+          ))}
+        </div>
+      </div>
+
+      {/* Guardian picker */}
+      {characters.length > 0 && !isSpectator && (
+        <>
+          <div className="mx-3 h-px bg-bungie-border/40" />
+          <div className="px-3 pt-2 pb-3">
+            <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Your Guardian</p>
+            <div className="space-y-1">
+              {[...characters]
+                .sort((a, b) => CLASS_ORDER.indexOf(a.classType) - CLASS_ORDER.indexOf(b.classType))
+                .map((c) => (
+                  <button
+                    key={c.characterId}
+                    onClick={() => handleSelectCharacter(c.characterId)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition ${
+                      selectedCharId === c.characterId
+                        ? "border-bungie-blue/50 bg-bungie-blue/10 text-white"
+                        : "border-transparent text-gray-400 hover:border-bungie-border hover:text-gray-300"
+                    }`}
+                  >
+                    <span className="text-sm">{CLASS_ICONS[c.classType] ?? "👤"}</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold leading-tight">{CLASS_NAMES[c.classType] ?? "Guardian"}</p>
+                      <p className="text-[9px] text-gray-500 leading-tight">{c.light}</p>
+                    </div>
+                    {selectedCharId === c.characterId && (
+                      <span className="ml-auto text-green-400 text-[10px]">✓</span>
+                    )}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </>
+      )}
+    </aside>
+  );
+
   const weaponBrowser = intersection && showWeaponBrowser ? (
     <WeaponPool
       intersection={effectiveIntersection ?? intersection}
@@ -1059,7 +1111,7 @@ export default function LobbyRoom({
 
   return (
     <>
-    <div className="flex gap-6 items-start">
+    <div className="flex gap-5 items-start">
       <div className="flex-1 min-w-0 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -1312,30 +1364,6 @@ export default function LobbyRoom({
           )}
         </div>
 
-        {/* Character picker - selecting your guardian is all a player needs to do */}
-        {characters.length > 0 && !isSpectator && (
-          <div className="bg-bungie-surface border border-bungie-border rounded-xl p-4">
-            <h2 className="text-white font-semibold mb-1">Your Character</h2>
-            <p className="text-xs text-gray-500 mb-3">
-              {selectedCharId
-                ? "Your most recent guardian was auto-selected. Tap another to switch."
-                : "Pick your guardian. Your selection saves automatically so your stats get tracked."}
-            </p>
-            <div className="flex gap-3 flex-wrap">
-              {[...characters]
-                .sort((a, b) => CLASS_ORDER.indexOf(a.classType) - CLASS_ORDER.indexOf(b.classType))
-                .map((c) => (
-                <button key={c.characterId} onClick={() => handleSelectCharacter(c.characterId)}
-                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition flex items-center gap-2 ${selectedCharId === c.characterId ? "border-bungie-blue bg-bungie-blue/20 text-white" : "border-bungie-border text-gray-400 hover:border-gray-500"}`}>
-                  <EmblemThumbnail emblemPath={c.emblemPath} classType={c.classType} />
-                  {selectedCharId === c.characterId && <span className="text-green-400">✓</span>}
-                  {CLASS_NAMES[c.classType] ?? "Guardian"} ·
-                  <LightLevelIcon light={c.light} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Captain controls */}
         {isCaptain && (
@@ -1536,14 +1564,7 @@ export default function LobbyRoom({
         )}
       </div>
 
-      {showPoolPanel && (intersection == null || showWeaponBrowser) && (
-        <div className="hidden xl:flex xl:flex-col w-[420px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] gap-2">
-          {poolHeader(true)}
-          {intersection
-            ? (weaponBrowser && <div className="overflow-y-auto">{weaponBrowser}</div>)
-            : poolLoadButton(true)}
-        </div>
-      )}
+      {sidebar}
     </div>
     </>
   );
