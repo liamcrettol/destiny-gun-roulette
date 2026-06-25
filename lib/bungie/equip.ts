@@ -153,13 +153,17 @@ export async function ensureInventorySpace(
     return results; // No vaulting needed
   }
 
-  // Find the lowest-light weapons to vault
-  const weaponsToVault = findLowestLightWeapons(
-    characterId,
-    roster,
-    vaultNeeded,
-    loadoutInstanceIds
-  );
+  // Find the lowest-light unequipped weapons on the character to vault
+  const weaponsToVault = roster
+    .filter(
+      (w) =>
+        w.location === "character" &&
+        w.characterId === characterId &&
+        !w.isEquipped &&
+        !loadoutInstanceIds.has(w.itemInstanceId)
+    )
+    .sort((a, b) => a.lightLevel - b.lightLevel)
+    .slice(0, vaultNeeded);
 
   if (weaponsToVault.length === 0) {
     // No unequipped weapons available to vault - this shouldn't happen with safety threshold
