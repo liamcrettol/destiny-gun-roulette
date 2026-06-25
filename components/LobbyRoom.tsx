@@ -729,12 +729,19 @@ export default function LobbyRoom({
   // selection so post-match stats can be collected. No separate "ready" step.
   const handleSelectCharacter = useCallback(async (characterId: string) => {
     setSelectedCharId(characterId);
+    const char = characters.find((c) => c.characterId === characterId);
     await fetch("/api/lobby/ready", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lobbyId: lobby.id, characterId, isReady: true }),
+      body: JSON.stringify({
+        lobbyId: lobby.id,
+        characterId,
+        isReady: true,
+        emblemPath: char?.emblemPath,
+        emblemBackgroundPath: char?.emblemBackgroundPath,
+      }),
     });
-  }, [lobby.id]);
+  }, [lobby.id, characters]);
 
   // Auto-select the most recently played character once characters load,
   // but only if the player hasn't already picked one (e.g. from a previous join).
