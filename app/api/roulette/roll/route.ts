@@ -4,6 +4,7 @@ import { adminSupabase } from "@/lib/supabase/admin";
 import { rollLoadout } from "@/lib/roulette/intersection";
 import { z } from "zod";
 import type { WeaponSlot } from "@/types/bungie";
+import { createLogger } from "@/lib/logger";
 
 const schema = z.object({
   lobbyId: z.string().uuid(),
@@ -41,9 +42,13 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const t = Date.now();
+  let log = createLogger(req);
   try {
     const session = await requireSession();
+    log = createLogger(req, session.userId);
     const body = schema.parse(await req.json());
+    log.info("roll.start", { lobbyId: body.lobbyId, roundId: body.roundId, mode: body.mode ?? "normal", rerollSlot: body.rerollSlot ?? null, wildcardSlots: body.wildcardSlots ?? [] });
 
     // Verify caller is captain
     const { data: lobby } = await adminSupabase
@@ -53,6 +58,8 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (lobby?.captain_user_id !== session.userId) {
+      log.warn("roll.forbidden", { lobbyId: body.lobbyId, captainId: lobby?.captain_user_id });
+      await log.flush();
       return NextResponse.json({ error: "Only the captain can roll" }, { status: 403 });
     }
 
@@ -149,9 +156,13 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await adminSupabase.from("lobbies").update({ status: "rolling", last_active_at: new Date().toISOString() } as any).eq("id", body.lobbyId);
 
+    log.info("roll.done", { lobbyId: body.lobbyId, roundId: body.roundId, roll, durationMs: Date.now() - t });
+    await log.flush();
     return NextResponse.json({ roll });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
+    log.error("roll.error", { error: msg, durationMs: Date.now() - t });
+    await log.flush();
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
