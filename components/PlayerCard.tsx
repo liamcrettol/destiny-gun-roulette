@@ -7,9 +7,10 @@ import type { LobbyMember } from "@/types/lobby";
 interface Props {
   member: LobbyMember;
   compact?: boolean;
+  variant?: "default" | "sidebar";
 }
 
-export default function PlayerCard({ member, compact }: Props) {
+export default function PlayerCard({ member, compact, variant = "default" }: Props) {
   const [bgFailed, setBgFailed] = useState(false);
   const [iconFailed, setIconFailed] = useState(false);
 
@@ -22,6 +23,33 @@ export default function PlayerCard({ member, compact }: Props) {
     !iconFailed && member.emblem_path
       ? `https://www.bungie.net${member.emblem_path}`
       : null;
+
+  if (variant === "sidebar") {
+    return (
+      <div
+        className={`flex items-center gap-2 px-1 py-1.5 rounded-lg ${
+          member.is_captain ? "text-yellow-400" : member.is_spectator ? "text-gray-600 opacity-60" : "text-gray-300"
+        }`}
+      >
+        <div className="relative shrink-0 w-[26px] h-[26px] rounded overflow-hidden border border-white/10">
+          {iconUrl ? (
+            <img src={iconUrl} alt="" className="w-full h-full object-cover" onError={() => setIconFailed(true)} />
+          ) : (
+            <div className="w-full h-full bg-bungie-border/30 flex items-center justify-center text-[10px]">
+              {member.is_captain ? "👑" : "👤"}
+            </div>
+          )}
+        </div>
+        <span className="text-xs font-medium truncate flex-1 min-w-0">
+          {member.is_captain && <span className="mr-1">👑</span>}
+          {trimBungieName(member.display_name)}
+        </span>
+        {!member.is_spectator && member.selected_character_id && (
+          <span className="text-green-400 text-xs shrink-0">✓</span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
