@@ -193,7 +193,7 @@ export default function RollDetails({
       <div className="px-3 py-3 flex gap-3">
         {/* Far-left rail: your rolls for this gun, scrollable. Click to pick
             which one drives your column; star favorites it. */}
-        <div className="w-[16rem] shrink-0 max-h-[22rem] overflow-y-auto pr-1 border-r border-bungie-border/50">
+        <div className="w-[16rem] shrink-0 max-h-[22rem] overflow-y-auto pr-1 border-r border-bungie-border/50 space-y-1">
           <p className={`text-xs font-semibold px-1 mb-1 ${theme.text}`}>Your rolls</p>
           {myInstances.length === 0 ? (
             <p className="text-gray-500 text-[10px] px-1">{me?.failed ? "couldn't load" : "—"}</p>
@@ -205,16 +205,26 @@ export default function RollDetails({
                 <div
                   key={inst.instanceId}
                   onClick={() => selectRoll(inst)}
-                  className={`flex items-center justify-between gap-2 rounded px-1.5 py-1 cursor-pointer border transition ${
-                    isSel ? `${theme.border} ${theme.bg}` : "border-transparent hover:bg-bungie-border/20"
+                  className={`group relative flex items-center justify-between gap-2 rounded pl-2.5 pr-1.5 py-1.5 cursor-pointer select-none border transition-all duration-150 ease-out active:scale-[0.98] ${
+                    isSel
+                      ? `${theme.border} ${theme.bg} scale-[1.02] shadow-sm`
+                      : "border-transparent hover:border-bungie-border hover:bg-bungie-border/25 hover:translate-x-0.5"
                   }`}
                 >
-                  {rollPreview(inst, false)}
+                  {/* Accent bar that grows in on selection */}
+                  <span
+                    className={`absolute left-0 top-1 bottom-1 w-0.5 rounded-full origin-center transition-all duration-200 ease-out ${theme.fill} ${
+                      isSel ? "opacity-100 scale-y-100" : "opacity-0 scale-y-50 group-hover:opacity-40 group-hover:scale-y-75"
+                    }`}
+                  />
+                  <div className="transition-transform duration-150 group-hover:scale-[1.03]">
+                    {rollPreview(inst, false)}
+                  </div>
                   {onToggleFavorite && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onToggleFavorite(activeTab, slot.itemHash, inst.instanceId); }}
                       title={fav ? "Unfavorite" : "Favorite (auto-picked on roll)"}
-                      className={`shrink-0 text-sm leading-none ${fav ? "text-yellow-400" : "text-gray-500 hover:text-yellow-400"}`}
+                      className={`shrink-0 text-sm leading-none transition-transform duration-150 hover:scale-125 active:scale-90 ${fav ? "text-yellow-400" : "text-gray-500 hover:text-yellow-400"}`}
                     >
                       {fav ? "★" : "☆"}
                     </button>
