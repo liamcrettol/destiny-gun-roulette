@@ -68,6 +68,11 @@ After the PR merges, the work is in **staging**. Wait for "ship it" before promo
 - Private repo. Contributors push directly to `main`: **Josh Sorensen (`jxsoren`)**,
   `vxkudo`, and the owner `liamcrettol`. `main` moves under you mid-session —
   **always `git fetch origin && git rebase origin/main` before starting AND before pushing.**
+- **Squash before push — one issue = one commit = one deployment.** Develop across as
+  many local commits as you like, but squash them into a single `Closes #N` commit
+  before pushing to `main`. Each push to `main` triggers a Vercel preview deployment,
+  so multiple pushes per issue flood the deployment list. Squash *before* pushing —
+  never force-push already-pushed commits on shared `main`.
 - Commit footer: `Co-Authored-By: Claude <model> <noreply@anthropic.com>`.
 - Windows/PowerShell: git here-strings (`@'...'@`) misparse as pathspecs. Use the Bash
   tool with a `$(cat <<'EOF' ... EOF)` heredoc for multi-line commit messages.
