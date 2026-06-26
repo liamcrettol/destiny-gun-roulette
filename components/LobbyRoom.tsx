@@ -1518,6 +1518,7 @@ export default function LobbyRoom({
             onChooseInstance={handleChooseInstance}
             favorites={favorites}
             onToggleFavorite={toggleFavorite}
+            memberCards={Object.fromEntries(members.map((m) => [m.user_id, m]))}
             loading={rollsLoading}
             error={rollsError}
             onRetry={fetchRolls}
