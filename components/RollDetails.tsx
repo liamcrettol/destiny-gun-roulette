@@ -99,16 +99,15 @@ export default function RollDetails({
   const myInstances = me?.instances ?? [];
   const chosenId = chosenInstances[activeTab];
   const myChosen = myInstances.find((i) => i.instanceId === chosenId) ?? myInstances[0];
+  // Which of your rolls drives your column — picked from the left rail.
+  const myShown = myInstances.find((i) => i.instanceId === highlightId) ?? myChosen;
 
-  // Flat list of every member's rolls for the left rail. The highlighted roll
-  // (whose stats fill the right column) defaults to your chosen pick.
-  const allRolls = members.flatMap((m) => m.instances.map((inst) => ({ member: m, inst })));
-  const defaultHL = me && myChosen ? { member: me, inst: myChosen } : allRolls[0];
-  const highlighted = allRolls.find((r) => r.inst.instanceId === highlightId) ?? defaultHL;
-  const hl = highlighted?.inst;
+  // The instance shown per member column: you = your picked roll, others = their first.
+  const shownFor = (m: MemberRolls): RollInstance | undefined =>
+    m.isMe ? myShown : m.instances[0];
 
-  const statRows = BAR_STATS.filter((s) => base[s] !== undefined || (hl && hl.stats[s] !== undefined));
-  const numRows = NUM_STATS.filter((s) => s !== "RPM" && s !== "Magazine" && (base[s] !== undefined || (hl && hl.stats[s] !== undefined)));
+  const statRows = BAR_STATS.filter((s) => base[s] !== undefined || members.some((m) => shownFor(m)?.stats[s] !== undefined));
+  const numRows = NUM_STATS.filter((s) => s !== "RPM" && s !== "Magazine" && (base[s] !== undefined || (myShown && myShown.stats[s] !== undefined)));
 
   // Reserve height for the tallest slot so switching tabs doesn't resize the panel and yank the page.
   const maxStatRows = Math.max(
@@ -122,9 +121,10 @@ export default function RollDetails({
     )
   );
 
-  const selectRoll = (m: MemberRolls, inst: RollInstance) => {
+  // Selecting a roll from the left rail (only ever your own rolls live there).
+  const selectRoll = (inst: RollInstance) => {
     setHighlightId(inst.instanceId);
-    if (m.isMe) onChooseInstance(activeTab, inst.instanceId);
+    onChooseInstance(activeTab, inst.instanceId);
   };
 
   // A roll's socket icons (barrel, magazine, all perks, masterwork), each with
@@ -168,108 +168,138 @@ export default function RollDetails({
         </div>
       </div>
 
-      <div className="px-3 py-3 flex flex-col sm:flex-row gap-3">
-        {/* Left rail: every member's rolls, scrollable. Click to inspect; star
-            favorites your own rolls. */}
-        <div className="w-full sm:w-[18rem] shrink-0 max-h-[20rem] overflow-y-auto pr-1 sm:border-r border-bungie-border/50">
-          {members.map((m) => (
-            <div key={m.userId} className="mb-2 last:mb-0">
-              <p className={`text-xs font-semibold truncate px-1 mb-1 ${m.isMe ? theme.text : "text-gray-200"}`}>
-                {m.isMe ? "You" : trimBungieName(m.displayName)}
-              </p>
-              {m.failed ? (
-                <p className="text-gray-500 text-[10px] italic px-1">couldn&apos;t load</p>
-              ) : m.instances.length === 0 ? (
-                <p className="text-gray-500 text-[10px] px-1">—</p>
-              ) : (
-                m.instances.map((inst) => {
-                  const isHL = inst.instanceId === hl?.instanceId;
-                  const fav = favorites?.[slot.itemHash.toString()] === inst.instanceId;
-                  return (
-                    <div
-                      key={inst.instanceId}
-                      onClick={() => selectRoll(m, inst)}
-                      className={`flex items-center justify-between gap-2 rounded px-1.5 py-1 cursor-pointer border transition ${
-                        isHL ? `${theme.border} ${theme.bg}` : "border-transparent hover:bg-bungie-border/20"
-                      }`}
+      <div className="px-3 py-3 flex gap-3">
+        {/* Far-left rail: your rolls for this gun, scrollable. Click to pick
+            which one drives your column; star favorites it. */}
+        <div className="w-[13rem] shrink-0 max-h-[22rem] overflow-y-auto pr-1 border-r border-bungie-border/50">
+          <p className={`text-xs font-semibold px-1 mb-1 ${theme.text}`}>You</p>
+          {myInstances.length === 0 ? (
+            <p className="text-gray-500 text-[10px] px-1">{me?.failed ? "couldn't load" : "—"}</p>
+          ) : (
+            myInstances.map((inst) => {
+              const isSel = inst.instanceId === myShown?.instanceId;
+              const fav = favorites?.[slot.itemHash.toString()] === inst.instanceId;
+              return (
+                <div
+                  key={inst.instanceId}
+                  onClick={() => selectRoll(inst)}
+                  className={`flex items-center justify-between gap-2 rounded px-1.5 py-1 cursor-pointer border transition ${
+                    isSel ? `${theme.border} ${theme.bg}` : "border-transparent hover:bg-bungie-border/20"
+                  }`}
+                >
+                  {rollPreview(inst)}
+                  {onToggleFavorite && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onToggleFavorite(activeTab, slot.itemHash, inst.instanceId); }}
+                      title={fav ? "Unfavorite" : "Favorite (auto-picked on roll)"}
+                      className={`shrink-0 text-sm leading-none ${fav ? "text-yellow-400" : "text-gray-500 hover:text-yellow-400"}`}
                     >
-                      {rollPreview(inst)}
-                      {m.isMe && onToggleFavorite && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onToggleFavorite(activeTab, slot.itemHash, inst.instanceId); }}
-                          title={fav ? "Unfavorite" : "Favorite (auto-picked on roll)"}
-                          className={`shrink-0 text-sm leading-none ${fav ? "text-yellow-400" : "text-gray-500 hover:text-yellow-400"}`}
-                        >
-                          {fav ? "★" : "☆"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          ))}
+                      {fav ? "★" : "☆"}
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
 
-        {/* Right column: stat bars for the highlighted roll vs the weapon base. */}
-        <div className="flex-1 min-w-0">
-          {hl ? (
-            <>
-              <p className="text-gray-400 text-[10px] uppercase tracking-wide mb-1.5">
-                {highlighted?.member.isMe ? "Your roll" : `${trimBungieName(highlighted!.member.displayName)}'s roll`}
-              </p>
-              <div className="grid grid-cols-[5.5rem_1fr] gap-x-3 gap-y-1 items-center">
-                {statRows.map((s) => {
-                  const v = hl.stats[s] ?? base[s];
-                  const hasBase = base[s] !== undefined;
-                  const delta = hasBase ? v - base[s] : 0;
-                  // Segmented bar: element fill up to the lower of base/value,
-                  // then the perk difference in green (gain) or red (loss).
-                  const lo = Math.min(100, Math.max(0, Math.min(v, hasBase ? base[s] : v)));
-                  const hi = Math.min(100, Math.max(0, Math.max(v, hasBase ? base[s] : v)));
-                  return (
-                    <div key={s} className="contents">
-                      <div className="text-gray-400 text-[11px]">{s}</div>
-                      <div className="flex items-center gap-1.5">
+        {/* Comparison: one column per member (you first), perks on top, stats below. */}
+        <div className="flex-1 min-w-0 overflow-x-auto">
+          <div
+            className="grid gap-x-3 gap-y-1 items-center"
+            style={{ gridTemplateColumns: `5.5rem repeat(${members.length}, 11rem)`, minWidth: "max-content" }}
+          >
+            {/* Header row: member names */}
+            <div />
+            {members.map((m) => (
+              <div key={`h-${m.userId}`} className="text-center">
+                <p className={`text-xs font-semibold truncate ${m.isMe ? theme.text : "text-gray-200"}`}>
+                  {m.isMe ? "You" : trimBungieName(m.displayName)}
+                </p>
+              </div>
+            ))}
+
+            {/* Divider */}
+            <div className="col-span-full h-px bg-bungie-border/50 my-1" />
+
+            {/* Perks row: each member's selected roll */}
+            <div className="text-gray-400 text-[10px] uppercase tracking-wide self-start pt-1">Roll</div>
+            {members.map((m) => {
+              const inst = shownFor(m);
+              return (
+                <div key={`roll-${m.userId}`} className="flex flex-wrap gap-1 justify-center">
+                  {m.failed ? (
+                    <span className="text-gray-500 text-[10px] italic">couldn&apos;t load</span>
+                  ) : inst ? (
+                    rollPreview(inst)
+                  ) : (
+                    <span className="text-gray-500 text-[10px]">—</span>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Stat rows: value per member, team-best highlighted */}
+            {statRows.map((s) => {
+              const vals = members.map((m) => {
+                const inst = shownFor(m);
+                return inst ? inst.stats[s] ?? base[s] : undefined;
+              });
+              const max = Math.max(...vals.filter((v): v is number => v !== undefined));
+              return (
+                <div key={s} className="contents">
+                  <div className="text-gray-400 text-[11px]">{s}</div>
+                  {members.map((m, i) => {
+                    const v = vals[i];
+                    if (v === undefined) return <div key={`${s}-${m.userId}`} className="text-center text-gray-500 text-[11px]">—</div>;
+                    const isBest = members.length > 1 && v === max;
+                    const hasBase = base[s] !== undefined;
+                    const delta = hasBase ? v - base[s] : 0;
+                    // Segmented bar: element fill up to the lower of base/value,
+                    // then the perk difference in green (gain) or red (loss).
+                    const lo = Math.min(100, Math.max(0, Math.min(v, hasBase ? base[s] : v)));
+                    const hi = Math.min(100, Math.max(0, Math.max(v, hasBase ? base[s] : v)));
+                    return (
+                      <div key={`${s}-${m.userId}`} className="flex items-center gap-1.5">
                         <div className="flex-1 h-1.5 bg-gray-700/80 rounded-full overflow-hidden flex">
                           <div className="h-full bg-gray-400" style={{ width: `${lo}%` }} />
                           {hi > lo && (
                             <div className={`h-full ${delta >= 0 ? "bg-green-400" : "bg-red-500/80"}`} style={{ width: `${hi - lo}%` }} />
                           )}
                         </div>
-                        <span className="w-5 text-right tabular-nums text-[11px] text-gray-300">{v}</span>
+                        <span className={`w-5 text-right tabular-nums text-[11px] ${isBest ? `${theme.text} font-semibold` : "text-gray-300"}`}>{v}</span>
                         {/* Always reserve the delta column so every bar lines up */}
                         <span className={`w-6 text-right text-[9px] tabular-nums ${delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : "text-transparent"}`}>
-                          {delta !== 0 ? (delta > 0 ? `+${delta}` : delta) : ""}
+                          {m.isMe && delta !== 0 ? (delta > 0 ? `+${delta}` : delta) : ""}
                         </span>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              );
+            })}
 
-                {/* Reserve height for the tallest slot so switching tabs doesn't resize the panel and yank the page. */}
-                {Array.from({ length: Math.max(0, maxStatRows - statRows.length) }).map((_, i) => (
-                  <div key={`pad-${i}`} className="contents" aria-hidden="true">
-                    <div className="text-[11px] invisible">—</div>
-                    <div className="text-[11px] invisible">—</div>
-                  </div>
+            {/* Reserve height for the tallest slot so switching tabs doesn't resize the panel and yank the page. */}
+            {Array.from({ length: Math.max(0, maxStatRows - statRows.length) }).map((_, i) => (
+              <div key={`pad-${i}`} className="contents" aria-hidden="true">
+                <div className="text-gray-400 text-[11px] invisible">—</div>
+                {members.map((m) => (
+                  <div key={`pad-${i}-${m.userId}`} className="text-[11px] invisible">—</div>
                 ))}
               </div>
+            ))}
+          </div>
 
-              {/* Intrinsic numeric stats */}
-              {anyNumRows && (
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-2 border-t border-bungie-border/50 min-h-[1.25rem]">
-                  {numRows.map((s) => (
-                    <div key={s} className="flex items-center gap-1.5">
-                      <span className="text-gray-500 text-[11px]">{s}</span>
-                      <span className="text-gray-300 text-[11px] tabular-nums font-medium">{hl.stats[s] ?? base[s]}</span>
-                    </div>
-                  ))}
+          {/* Intrinsic numeric stats (shared) */}
+          {anyNumRows && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-2 border-t border-bungie-border/50 min-h-[1.25rem]">
+              {numRows.map((s) => (
+                <div key={s} className="flex items-center gap-1.5">
+                  <span className="text-gray-500 text-[11px]">{s}</span>
+                  <span className="text-gray-300 text-[11px] tabular-nums font-medium">{myShown?.stats[s] ?? base[s]}</span>
                 </div>
-              )}
-            </>
-          ) : (
-            <p className="text-gray-500 text-xs">No rolls to show.</p>
+              ))}
+            </div>
           )}
         </div>
       </div>
