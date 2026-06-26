@@ -136,7 +136,7 @@ export default function RollDetails({
   // the comparison columns) wraps and centers; the compact variant (left rail)
   // stays on one line and groups sockets with thin separators.
   const rollPreview = (inst: RollInstance, large = true) => {
-    const cls = `${large ? "w-11 h-11" : "w-9 h-9"} rounded border border-bungie-blue/40 hover:border-bungie-blue cursor-help transition`;
+    const cls = `${large ? "w-10 h-10" : "w-9 h-9"} rounded border border-bungie-blue/40 hover:border-bungie-blue cursor-help transition`;
     const barrel = <PerkIcon icon={inst.barrelIcon} name={inst.barrelName} className={cls} />;
     const magazine = <PerkIcon icon={inst.magazineIcon} name={inst.magazineName} className={cls} />;
     const perks = inst.perkHashes.map((hash, i) => (
@@ -197,7 +197,7 @@ export default function RollDetails({
       <div className="px-3 py-3 flex gap-3">
         {/* Far-left rail: your rolls for this gun, scrollable. Click to pick
             which one drives your column; star favorites it. */}
-        <div className="w-[22rem] shrink-0 max-h-[22rem] overflow-y-auto pr-1 border-r border-bungie-border/50 space-y-1">
+        <div className="w-fit min-w-[13rem] max-w-[20rem] shrink-0 max-h-[22rem] overflow-y-auto pr-1 border-r border-bungie-border/50 space-y-1">
           <p className={`text-xs font-semibold px-1 mb-1 ${theme.text}`}>Your rolls</p>
           {myInstances.length === 0 ? (
             <p className="text-gray-500 text-[10px] px-1">{me?.failed ? "couldn't load" : "—"}</p>
@@ -243,7 +243,7 @@ export default function RollDetails({
         <div className="flex-1 min-w-0 overflow-x-auto">
           <div
             className="grid gap-x-3 gap-y-1.5 items-center"
-            style={{ gridTemplateColumns: `5.5rem repeat(${members.length}, minmax(17rem, 1fr))` }}
+            style={{ gridTemplateColumns: `5.5rem repeat(${members.length}, minmax(14rem, 1fr))` }}
           >
             {/* Header row: each member's emblem player card (fallback to name) */}
             <div />
@@ -252,7 +252,7 @@ export default function RollDetails({
               return (
                 <div key={`h-${m.userId}`} className="flex justify-center">
                   {card ? (
-                    <PlayerCard member={card} />
+                    <PlayerCard member={card} compact />
                   ) : (
                     <p className={`text-xs font-semibold truncate text-center ${m.isMe ? theme.text : "text-gray-200"}`}>
                       {m.isMe ? "You" : trimBungieName(m.displayName)}

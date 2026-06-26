@@ -6,9 +6,10 @@ import type { LobbyMember } from "@/types/lobby";
 
 interface Props {
   member: LobbyMember;
+  compact?: boolean;
 }
 
-export default function PlayerCard({ member }: Props) {
+export default function PlayerCard({ member, compact }: Props) {
   const [bgFailed, setBgFailed] = useState(false);
   const [iconFailed, setIconFailed] = useState(false);
 
@@ -24,7 +25,7 @@ export default function PlayerCard({ member }: Props) {
 
   return (
     <div
-      className={`relative flex items-center gap-0 rounded-lg overflow-hidden border h-16 min-w-[260px] max-w-[340px]
+      className={`relative flex items-center gap-0 rounded-lg overflow-hidden border ${compact ? "h-11 min-w-[170px] max-w-[230px]" : "h-16 min-w-[260px] max-w-[340px]"}
         ${member.is_captain
           ? "border-yellow-500/60"
           : member.is_spectator
@@ -54,7 +55,7 @@ export default function PlayerCard({ member }: Props) {
       )}
 
       {/* Emblem icon — left square */}
-      <div className="relative shrink-0 w-16 h-16">
+      <div className={`relative shrink-0 ${compact ? "w-11 h-11" : "w-16 h-16"}`}>
         {iconUrl ? (
           <img
             src={iconUrl}
@@ -73,7 +74,7 @@ export default function PlayerCard({ member }: Props) {
           <div className="flex items-center gap-1.5">
             {member.is_captain && <span className="text-xs">👑</span>}
             <span
-              className={`text-sm font-semibold truncate leading-tight
+              className={`${compact ? "text-xs" : "text-sm"} font-semibold truncate leading-tight
                 ${member.is_spectator ? "text-gray-500" : "text-white"}`}
             >
               {trimBungieName(member.display_name)}
