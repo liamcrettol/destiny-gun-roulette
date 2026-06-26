@@ -485,6 +485,7 @@ export default function LobbyRoom({
   const roundIdRef = useRef<string | null>(null);
   useEffect(() => { roundIdRef.current = roundId; }, [roundId]);
   const hasAutoLoaded = useRef(false);
+  const prevMemberCount = useRef<number | null>(null);
   const prevRoundIdRef = useRef<string | null>(null);
   // Clear per-round UI state when the round actually advances (non-null → different non-null).
   useEffect(() => {
@@ -642,13 +643,32 @@ export default function LobbyRoom({
       .then((d) => { if (d.characters) setCharacters(d.characters); });
   }, []);
 
+  // Auto-load the shared pool for any participant (not just the captain) once
+  // the round is ready, so a joining member doesn't have to click "Load Shared
+  // Weapons" themselves. The captain's load also seeds the initial roll;
+  // non-captains just populate their pool view (handleLoadIntersection only
+  // rolls when isCaptain).
   useEffect(() => {
     if (hasAutoLoaded.current) return;
-    if (!isCaptain || !roundId) return;
+    if (isSpectator || !roundId) return;
     hasAutoLoaded.current = true;
     handleLoadIntersection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCaptain, roundId]);
+  }, [isSpectator, roundId]);
+
+  // When a new non-spectator joins, refresh the pool for everyone already
+  // loaded — without re-rolling — so the captain's pool reflects the new member
+  // without a manual reload. Skipped during an active game.
+  useEffect(() => {
+    const count = members.filter((m) => !m.is_spectator).length;
+    if (prevMemberCount.current === null) { prevMemberCount.current = count; return; }
+    const prev = prevMemberCount.current;
+    prevMemberCount.current = count;
+    if (!hasAutoLoaded.current || count <= prev) return;
+    if (lobbyData.status === "in_game") return;
+    handleLoadIntersection({ roll: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, lobbyData.status]);
 
   useEffect(() => {
     async function loadCurrentRound() {
@@ -749,7 +769,10 @@ export default function LobbyRoom({
     if (target) handleSelectCharacter(target);
   }, [characters, handleSelectCharacter]);
 
-  const handleLoadIntersection = useCallback(async () => {
+  const handleLoadIntersection = useCallback(async (opts?: { roll?: boolean }) => {
+    // Roster-change refreshes pass roll:false so the pool updates without
+    // re-rolling the captain's current loadout.
+    const doRoll = opts?.roll !== false;
     setLoadingAction("intersection");
     setIntersectionError(null);
     try {
@@ -768,7 +791,7 @@ export default function LobbyRoom({
       setWeaponDetails(data.weaponDetails ?? {});
       setInstancePerks(data.instancePerks ?? {});
       setCollectionHashes(new Set<number>(data.collectionHashes ?? []));
-      if (isCaptain && roundId) {
+      if (doRoll && isCaptain && roundId) {
         const equipped: Record<string, number> = {};
         const eq = data.equippedHashes as Record<string, number | null>;
         for (const slot of ["kinetic", "energy", "power"]) {
@@ -1042,7 +1065,7 @@ export default function LobbyRoom({
           Everyone needs to do this so the captain can roll a loadout you all own.
         </p>
         <button
-          onClick={handleLoadIntersection}
+          onClick={() => handleLoadIntersection()}
           disabled={loadingAction !== null}
           className="w-full px-4 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
         >
@@ -1353,7 +1376,7 @@ export default function LobbyRoom({
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button onClick={handleLoadIntersection} disabled={loadingAction !== null}
+              <button onClick={() => handleLoadIntersection()} disabled={loadingAction !== null}
                 className="px-4 py-2 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition">
                 {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
               </button>
