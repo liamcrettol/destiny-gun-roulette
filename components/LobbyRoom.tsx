@@ -244,6 +244,9 @@ export default function LobbyRoom({
   }>>({});
   const [instancePerks, setInstancePerks] = useState<Record<string, Array<{ instanceId: string; perks: string[]; location: string; characterId?: string }>>>({});
   const [collectionHashes, setCollectionHashes] = useState<Set<number>>(new Set());
+  // The caller's currently-equipped weapon per slot, captured when the pool
+  // loads — used to seed the captain's initial loadout from equipped.
+  const [equippedHashes, setEquippedHashes] = useState<Partial<Record<WeaponSlot, number>>>({});
   const [preferredInstances, setPreferredInstances] = useState<Partial<Record<WeaponSlot, string>>>({});
   // Per-player roll data (everyone's instances of the current loadout) and the
   // instance THIS player has chosen to equip for each slot.
@@ -492,6 +495,8 @@ export default function LobbyRoom({
   const roundIdRef = useRef<string | null>(null);
   useEffect(() => { roundIdRef.current = roundId; }, [roundId]);
   const hasAutoLoaded = useRef(false);
+  const hasSeeded = useRef(false);
+  const prevMemberCount = useRef<number | null>(null);
   const prevRoundIdRef = useRef<string | null>(null);
   // Clear per-round UI state when the round actually advances (non-null → different non-null).
   useEffect(() => {
@@ -502,6 +507,7 @@ export default function LobbyRoom({
       setWildcardSlots(new Set<WeaponSlot>(["power"]));
       setPreferredInstances({});
       hasAutoLoaded.current = false;
+      hasSeeded.current = false;
     }
     prevRoundIdRef.current = roundId;
   }, [roundId]);
@@ -649,13 +655,113 @@ export default function LobbyRoom({
       .then((d) => { if (d.characters) setCharacters(d.characters); });
   }, []);
 
+  // Auto-load the shared pool for any participant (not just the captain) once
+  // the round is ready, so a joining member doesn't have to click "Load Shared
+  // Weapons" themselves. The captain's load also seeds the initial roll;
+  // non-captains just populate their pool view (handleLoadIntersection only
+  // rolls when isCaptain).
   useEffect(() => {
     if (hasAutoLoaded.current) return;
-    if (!isCaptain || !roundId) return;
+    if (isSpectator || !roundId) return;
     hasAutoLoaded.current = true;
     handleLoadIntersection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCaptain, roundId]);
+  }, [isSpectator, roundId]);
+
+  // When a new non-spectator joins, refresh the pool for everyone already
+  // loaded — without re-rolling — so the captain's pool reflects the new member
+  // without a manual reload. Skipped during an active game.
+  useEffect(() => {
+    const count = members.filter((m) => !m.is_spectator).length;
+    if (prevMemberCount.current === null) { prevMemberCount.current = count; return; }
+    const prev = prevMemberCount.current;
+    prevMemberCount.current = count;
+    if (!hasAutoLoaded.current || count <= prev) return;
+    if (lobbyData.status === "in_game") return;
+    console.log("[d2r-seed] roster grew", { prev, count, hasSlots: slots.some((s) => s.item_hash !== 0) });
+    handleLoadIntersection();
+    // Refresh the comparison so the new member's rolls appear without waiting
+    // for a slot change (fetchRolls otherwise only re-runs on slot changes).
+    if (slots.some((s) => s.item_hash !== 0)) fetchRolls();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, lobbyData.status]);
+
+  // Seed the captain's loadout from their equipped weapons once the pool is
+  // loaded and the round has no loadout yet, so the Roll Comparison reflects
+  // their equipped guns immediately (Roll All only randomizes). Runs once per
+  // round and never overwrites an existing/rolled loadout.
+  useEffect(() => {
+    // TEMP diagnostics (#141) — remove once the captain seed is confirmed.
+    console.log("[d2r-seed] effect run", {
+      hasSeeded: hasSeeded.current,
+      isCaptain,
+      roundId,
+      hasIntersection: !!intersection,
+      nonZeroSlots: slots.filter((s) => s.item_hash !== 0).length,
+      equippedHashes,
+    });
+    if (hasSeeded.current) return;
+    if (!isCaptain || !roundId || !intersection) { console.log("[d2r-seed] blocked: missing captain/round/intersection"); return; }
+    if (slots.some((s) => s.item_hash !== 0)) { console.log("[d2r-seed] blocked: slots already populated"); hasSeeded.current = true; return; }
+    hasSeeded.current = true;
+    const seedRoundId = roundId;
+    const keep: Record<string, number> = {};
+    for (const s of ["kinetic", "energy", "power"] as WeaponSlot[]) {
+      if (equippedHashes[s] != null) keep[s] = equippedHashes[s]!;
+    }
+    console.log("[d2r-seed] seeding now, keep=", keep);
+    (async () => {
+      try {
+        const res = await fetch("/api/roulette/roll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lobbyId: lobby.id, roundId: seedRoundId, intersection,
+            weaponDetails,
+            keepSlots: Object.keys(keep).length > 0 ? keep : undefined,
+          }),
+        });
+        const data = await res.json();
+        console.log("[d2r-seed] roll response", { ok: res.ok, status: res.status, roll: data.roll, error: data.error });
+        if (!res.ok || !data.roll) { hasSeeded.current = false; return; }
+        // Reflect the seeded loadout locally right away. The seeding client
+        // otherwise waits on the realtime echo of its own write, which is why
+        // the captain stayed empty while viewers already saw the comparison.
+        const now = new Date().toISOString();
+        const seeded: LobbyLoadoutSlot[] = [];
+        for (const s of ["kinetic", "energy", "power"] as WeaponSlot[]) {
+          const hash = data.roll[s];
+          if (!hash) continue;
+          const detail = weaponDetails[hash.toString()];
+          seeded.push({
+            id: `seed-${seedRoundId}-${s}`,
+            round_id: seedRoundId,
+            slot: s,
+            item_hash: hash,
+            weapon_name: detail?.name ?? "",
+            weapon_icon: detail?.icon ?? "",
+            weapon_type: detail?.weaponType ?? "",
+            damage_type: detail?.damageType ?? "",
+            locked_by_user_id: currentUserId,
+            created_at: now,
+          });
+        }
+        console.log("[d2r-seed] applying local slots", seeded.map((s) => ({ slot: s.slot, hash: s.item_hash, name: s.weapon_name })));
+        if (seeded.length > 0) {
+          setSlots((prev) => {
+            // If a real roll already landed (via realtime), don't clobber it.
+            if (prev.some((p) => p.item_hash !== 0)) return prev;
+            const others = prev.filter((p) => !seeded.some((x) => x.slot === p.slot));
+            return [...others, ...seeded];
+          });
+        }
+      } catch (e) {
+        console.log("[d2r-seed] error", e);
+        hasSeeded.current = false;
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCaptain, roundId, intersection, equippedHashes, slotKey]);
 
   useEffect(() => {
     async function loadCurrentRound() {
@@ -756,6 +862,9 @@ export default function LobbyRoom({
     if (target) handleSelectCharacter(target);
   }, [characters, handleSelectCharacter]);
 
+  // Loads the shared pool only. Seeding the captain's loadout from equipped is
+  // handled by a dedicated effect below, so the comparison appears as soon as
+  // the pool is ready (no Roll All needed) regardless of load/captain timing.
   const handleLoadIntersection = useCallback(async () => {
     setLoadingAction("intersection");
     setIntersectionError(null);
@@ -775,27 +884,17 @@ export default function LobbyRoom({
       setWeaponDetails(data.weaponDetails ?? {});
       setInstancePerks(data.instancePerks ?? {});
       setCollectionHashes(new Set<number>(data.collectionHashes ?? []));
-      if (isCaptain && roundId) {
-        const equipped: Record<string, number> = {};
-        const eq = data.equippedHashes as Record<string, number | null>;
-        for (const slot of ["kinetic", "energy", "power"]) {
-          if (eq?.[slot] != null) equipped[slot] = eq[slot]!;
-        }
-        await fetch("/api/roulette/roll", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lobbyId: lobby.id, roundId, intersection: data.intersection,
-            weaponDetails: data.weaponDetails ?? {},
-            keepSlots: Object.keys(equipped).length > 0 ? equipped : undefined,
-          }),
-        });
+      const eq = data.equippedHashes as Record<string, number | null> | undefined;
+      const equipped: Partial<Record<WeaponSlot, number>> = {};
+      for (const slot of ["kinetic", "energy", "power"] as WeaponSlot[]) {
+        if (eq?.[slot] != null) equipped[slot] = eq[slot]!;
       }
+      setEquippedHashes(equipped);
     } catch (e) {
       setIntersectionError(e instanceof Error ? e.message : "Network error");
     }
     setLoadingAction(null);
-  }, [lobby.id, isCaptain, slots.length, roundId, selectedCharId]);
+  }, [lobby.id, selectedCharId]);
 
   // Write a roll for an explicit wildcard set (avoids stale wildcardSlots state).
   // Keeps every slot's current real weapon except wildcards, the sentinel 0, and
@@ -1109,7 +1208,7 @@ export default function LobbyRoom({
           Everyone needs to do this so the captain can roll a loadout you all own.
         </p>
         <button
-          onClick={handleLoadIntersection}
+          onClick={() => handleLoadIntersection()}
           disabled={loadingAction !== null}
           className="w-full px-4 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
         >
@@ -1498,6 +1597,7 @@ export default function LobbyRoom({
             onChooseInstance={handleChooseInstance}
             favorites={favorites}
             onToggleFavorite={toggleFavorite}
+            memberCards={Object.fromEntries(members.map((m) => [m.user_id, m]))}
             loading={rollsLoading}
             error={rollsError}
             onRetry={fetchRolls}
