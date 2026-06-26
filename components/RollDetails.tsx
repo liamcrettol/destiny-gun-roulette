@@ -245,12 +245,13 @@ export default function RollDetails({
             className="grid gap-x-3 gap-y-1.5 items-center"
             style={{ gridTemplateColumns: `5.5rem repeat(${members.length}, minmax(14rem, 1fr))` }}
           >
-            {/* Header row: each member's emblem player card (fallback to name) */}
-            <div />
-            {members.map((m) => {
+            {/* Header row: each member's emblem player card (fallback to name).
+                The first card also spans the stat-label column so it starts
+                flush against the rolls rail, above the Impact/Range labels. */}
+            {members.map((m, idx) => {
               const card = memberCards?.[m.userId];
               return (
-                <div key={`h-${m.userId}`} className="min-w-0">
+                <div key={`h-${m.userId}`} className={`min-w-0 ${idx === 0 ? "col-span-2" : ""}`}>
                   {card ? (
                     <PlayerCard member={card} compact />
                   ) : (
