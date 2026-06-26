@@ -680,15 +680,25 @@ export default function LobbyRoom({
   // their equipped guns immediately (Roll All only randomizes). Runs once per
   // round and never overwrites an existing/rolled loadout.
   useEffect(() => {
+    // TEMP diagnostics (#141) — remove once the captain seed is confirmed.
+    console.log("[d2r-seed] effect run", {
+      hasSeeded: hasSeeded.current,
+      isCaptain,
+      roundId,
+      hasIntersection: !!intersection,
+      nonZeroSlots: slots.filter((s) => s.item_hash !== 0).length,
+      equippedHashes,
+    });
     if (hasSeeded.current) return;
-    if (!isCaptain || !roundId || !intersection) return;
-    if (slots.some((s) => s.item_hash !== 0)) { hasSeeded.current = true; return; }
+    if (!isCaptain || !roundId || !intersection) { console.log("[d2r-seed] blocked: missing captain/round/intersection"); return; }
+    if (slots.some((s) => s.item_hash !== 0)) { console.log("[d2r-seed] blocked: slots already populated"); hasSeeded.current = true; return; }
     hasSeeded.current = true;
     const seedRoundId = roundId;
     const keep: Record<string, number> = {};
     for (const s of ["kinetic", "energy", "power"] as WeaponSlot[]) {
       if (equippedHashes[s] != null) keep[s] = equippedHashes[s]!;
     }
+    console.log("[d2r-seed] seeding now, keep=", keep);
     (async () => {
       try {
         const res = await fetch("/api/roulette/roll", {
@@ -701,6 +711,7 @@ export default function LobbyRoom({
           }),
         });
         const data = await res.json();
+        console.log("[d2r-seed] roll response", { ok: res.ok, status: res.status, roll: data.roll, error: data.error });
         if (!res.ok || !data.roll) { hasSeeded.current = false; return; }
         // Reflect the seeded loadout locally right away. The seeding client
         // otherwise waits on the realtime echo of its own write, which is why
@@ -724,6 +735,7 @@ export default function LobbyRoom({
             created_at: now,
           });
         }
+        console.log("[d2r-seed] applying local slots", seeded.map((s) => ({ slot: s.slot, hash: s.item_hash, name: s.weapon_name })));
         if (seeded.length > 0) {
           setSlots((prev) => {
             // If a real roll already landed (via realtime), don't clobber it.
@@ -732,7 +744,8 @@ export default function LobbyRoom({
             return [...others, ...seeded];
           });
         }
-      } catch {
+      } catch (e) {
+        console.log("[d2r-seed] error", e);
         hasSeeded.current = false;
       }
     })();
