@@ -63,7 +63,7 @@ export default function LobbyControls({ activeSession }: Props) {
           <div>
             <p className="text-white font-semibold text-sm">Active session detected</p>
             <p className="text-gray-400 text-xs mt-0.5">
-              <span className="font-mono text-bungie-blue">{activeSession.code}</span>
+              <span className="font-mono text-bungie-blue slashed-zero">{activeSession.code}</span>
               {" · "}
               {STATUS_LABELS[activeSession.status]}
             </p>
@@ -104,7 +104,7 @@ export default function LobbyControls({ activeSession }: Props) {
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="ABC123"
             maxLength={8}
-            className="flex-1 bg-bungie-dark border border-bungie-border rounded-lg px-3 py-2 text-white font-mono text-center uppercase tracking-widest focus:outline-none focus:border-bungie-blue"
+            className="flex-1 bg-bungie-dark border border-bungie-border rounded-lg px-3 py-2 text-white font-mono text-center uppercase tracking-widest slashed-zero focus:outline-none focus:border-bungie-blue"
           />
           <button
             type="submit"

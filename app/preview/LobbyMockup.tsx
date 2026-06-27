@@ -105,7 +105,7 @@ export default function LobbyMockup() {
         <div>
           <h1 className="text-2xl font-bold text-white">Lobby</h1>
           <p className="text-gray-400 text-sm">
-            Code: <span className="font-mono text-bungie-blue font-bold tracking-widest">TEST01</span>
+            Code: <span className="font-mono text-bungie-blue font-bold tracking-widest slashed-zero">TEST01</span>
             {" "}· share with your fireteam
           </p>
         </div>

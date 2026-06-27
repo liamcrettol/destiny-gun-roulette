@@ -1234,7 +1234,7 @@ export default function LobbyRoom({
               <button
                 onClick={copyCode}
                 title="Copy lobby code"
-                className="font-mono text-bungie-blue font-bold tracking-widest text-lg hover:opacity-75 transition"
+                className="font-mono text-bungie-blue font-bold tracking-widest slashed-zero text-lg hover:opacity-75 transition"
               >
                 {copied ? "✓" : lobby.code}
               </button>
