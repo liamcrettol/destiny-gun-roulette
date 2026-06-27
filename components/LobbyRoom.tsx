@@ -1226,9 +1226,9 @@ export default function LobbyRoom({
   return (
     <>
     <div className="flex flex-col xl:flex-row gap-5 xl:items-start">
-      <div className="flex-1 min-w-0 space-y-6">
+      <div className="flex-1 min-w-0 flex flex-col gap-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="order-1 flex items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <button
@@ -1307,7 +1307,7 @@ export default function LobbyRoom({
         </div>
 
         {/* Stats panel: Session / History / Leaderboard tabs */}
-        <div className="bg-bungie-surface border border-bungie-border/40 rounded-xl overflow-hidden">
+        <div className="order-7 bg-bungie-surface border border-bungie-border/40 rounded-xl overflow-hidden">
           {/* Post-game dismissible banner */}
           {lastGameStats && lastGameStats.length > 0 && (() => {
             const top = [...lastGameStats].sort((a, b) => b.kills - a.kills)[0];
@@ -1497,7 +1497,7 @@ export default function LobbyRoom({
 
         {/* Action row */}
         {!isSpectator && roundId && (
-          <div className="relative flex items-center gap-3 flex-wrap">
+          <div className="order-3 relative flex items-center gap-3 flex-wrap">
             {isCaptain && (
               <button
                 onClick={() => handleRoll()}
@@ -1569,7 +1569,7 @@ export default function LobbyRoom({
         )}
 
         {slots.length > 0 && (
-          <div className={`relative transition-all duration-500 ${loadingAction === "roll" ? "after:absolute after:inset-0 after:rounded-xl after:bg-bungie-blue/5 after:pointer-events-none" : ""}`}>
+          <div className={`order-2 relative transition-all duration-500 ${loadingAction === "roll" ? "after:absolute after:inset-0 after:rounded-xl after:bg-bungie-blue/5 after:pointer-events-none" : ""}`}>
             <LoadoutQueue
               slots={slots}
               weaponDetails={weaponDetails}
@@ -1591,6 +1591,7 @@ export default function LobbyRoom({
         )}
 
         {slots.some((s) => s.item_hash !== 0) && (
+          <div className="order-5">
           <RollDetails
             rolls={rollsData}
             chosenInstances={myChosenInstances}
@@ -1602,17 +1603,20 @@ export default function LobbyRoom({
             error={rollsError}
             onRetry={fetchRolls}
           />
+          </div>
         )}
 
         {applyResults.length > 0 && (
+          <div className="order-6">
           <ApplyStatus results={applyResults} onClear={() => setApplyResults([])} />
+          </div>
         )}
 
         {/* Drawers */}
-        <div className="space-y-2">
+        <div className="order-4 flex flex-col gap-2">
           {/* Roll Settings drawer (captain only) */}
           {isCaptain && intersection && (
-            <div className="border border-bungie-border/40 rounded-xl overflow-hidden">
+            <div className="order-2 border border-bungie-border/40 rounded-xl overflow-hidden">
               <button
                 onClick={() => setRollSettingsOpen((v) => !v)}
                 className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition"
@@ -1644,7 +1648,7 @@ export default function LobbyRoom({
 
           {/* Weapon Pool drawer */}
           {!isSpectator && (
-            <div className="border border-bungie-border/40 rounded-xl overflow-hidden">
+            <div className="order-1 border border-bungie-border/40 rounded-xl overflow-hidden">
               <button
                 onClick={() => {
                   if (!intersection && isCaptain) handleLoadIntersection();
