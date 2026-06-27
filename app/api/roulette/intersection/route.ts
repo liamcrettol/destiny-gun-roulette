@@ -354,6 +354,12 @@ export async function POST(req: NextRequest) {
       if (!def.collectibleHash) continue;
       const slot = bucketToSlot(def.defaultBucketHash);
       if (!slot) continue;
+      // Skip if a variant of this exotic is already in the intersection for
+      // this slot (Phase 4 already added a representative for the group).
+      // Without this check, re-released exotics with a different hash would
+      // appear twice in the pool and be tracked as two separate weapons.
+      const variantHashes = getWeaponGroupHashes(hash);
+      if (variantHashes.some((v) => intersection[slot].has(v))) continue;
       let allHaveIt = true;
       for (const [userId, sets] of memberSlotSets) {
         if (sets[slot].has(hash)) continue;
