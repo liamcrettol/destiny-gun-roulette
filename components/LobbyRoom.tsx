@@ -1003,7 +1003,7 @@ export default function LobbyRoom({
             <h1 className="text-2xl font-bold text-white">Lobby</h1>
             <div className="text-gray-400 text-sm flex items-center gap-2 flex-wrap mt-0.5">
               <span>
-                Code: <span className="font-mono text-bungie-blue font-bold tracking-widest">{lobby.code}</span>
+                Code: <span className="font-mono text-bungie-blue font-bold tracking-widest slashed-zero">{lobby.code}</span>
               </span>
               <button
                 onClick={copyCode}

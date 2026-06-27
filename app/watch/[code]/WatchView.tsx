@@ -240,7 +240,7 @@ export default function WatchView({
         <div>
           <h1 className="text-2xl font-bold text-white">Gun Roulette</h1>
           <p className="text-gray-400 text-sm">
-            Watching <span className="font-mono text-bungie-blue font-bold">{code}</span> · Round {roundNumber}
+            Watching <span className="font-mono text-bungie-blue font-bold slashed-zero">{code}</span> · Round {roundNumber}
           </p>
         </div>
         <span className={`text-xs px-2 py-1 rounded-full border ${badge.cls}`}>{badge.label}</span>
