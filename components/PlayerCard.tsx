@@ -51,9 +51,12 @@ export default function PlayerCard({ member, compact, variant = "default" }: Pro
     );
   }
 
+  // Banner-only card: the full emblem (emblem_background_path) IS the card — no
+  // separate left icon square (that was a redundant second copy of the emblem).
+  // Captain is conveyed by the yellow border, not a crown.
   return (
     <div
-      className={`relative flex items-center gap-0 rounded-lg overflow-hidden border ${compact ? "h-11 w-full min-w-0 max-w-[420px]" : "h-16 min-w-[260px] max-w-[340px]"}
+      className={`relative flex items-center rounded-lg overflow-hidden border w-full ${compact ? "h-14" : "h-[4.5rem]"}
         ${member.is_captain
           ? "border-yellow-500/60"
           : member.is_spectator
@@ -61,7 +64,7 @@ export default function PlayerCard({ member, compact, variant = "default" }: Pro
           : "border-bungie-border"
         }`}
     >
-      {/* Emblem background banner */}
+      {/* Emblem banner */}
       {bgUrl ? (
         <>
           {/* Hidden img to detect load failure */}
@@ -75,46 +78,30 @@ export default function PlayerCard({ member, compact, variant = "default" }: Pro
             className="absolute inset-0 bg-cover bg-left"
             style={{ backgroundImage: `url(${bgUrl})` }}
           />
-          {/* Dark gradient overlay so text stays legible */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-black/50 to-black/80" />
+          {/* Legibility gradient: clearer over the emblem art (left), darker
+              behind the name (right). */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/25 via-black/40 to-black/85" />
         </>
       ) : (
         <div className="absolute inset-0 bg-bungie-dark" />
       )}
 
-      {/* Emblem icon — left square */}
-      <div className={`relative shrink-0 ${compact ? "w-11 h-11" : "w-16 h-16"}`}>
-        {iconUrl ? (
-          <img
-            src={iconUrl}
-            alt=""
-            className="w-full h-full object-cover"
-            onError={() => setIconFailed(true)}
-          />
-        ) : (
-          <div className="w-full h-full bg-bungie-border/30" />
-        )}
-      </div>
-
-      {/* Name + badges */}
-      <div className="relative flex-1 flex items-center gap-2 px-3 min-w-0">
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-1.5">
-            {member.is_captain && <span className="text-xs">👑</span>}
-            <span
-              className={`${compact ? "text-xs" : "text-sm"} font-semibold truncate leading-tight
-                ${member.is_spectator ? "text-gray-500" : "text-white"}`}
-            >
-              {trimBungieName(member.display_name)}
-            </span>
-          </div>
+      {/* Name + guardian-selected check, overlaid on the right (darker) side. */}
+      <div className="relative ml-auto flex items-center gap-2 px-3 max-w-[68%] min-w-0">
+        <div className="flex flex-col min-w-0 text-right">
+          <span
+            className={`${compact ? "text-sm" : "text-base"} font-bold truncate leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]
+              ${member.is_spectator ? "text-gray-300" : "text-white"}`}
+          >
+            {trimBungieName(member.display_name)}
+          </span>
           {member.is_spectator && (
-            <span className="text-[10px] text-gray-500 leading-tight">spectating</span>
+            <span className="text-[10px] text-gray-300 leading-tight drop-shadow">spectating</span>
           )}
         </div>
 
         {!member.is_spectator && member.selected_character_id && (
-          <span className="ml-auto shrink-0 text-green-400 text-xs" title="Guardian selected">
+          <span className="shrink-0 text-green-400 text-sm drop-shadow" title="Guardian selected">
             ✓
           </span>
         )}
