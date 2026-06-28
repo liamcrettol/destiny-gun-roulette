@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Lobby, LobbyMember, LobbyLoadoutSlot } from "@/types/lobby";
+import type { Lobby, LobbyMember, LobbyLoadoutSlot, LobbyRollSettings } from "@/types/lobby";
 import type { DestinyCharacter } from "@/types/bungie";
 import type { WeaponSlot } from "@/types/bungie";
 import LoadoutQueue from "./LoadoutQueue";
@@ -15,6 +15,7 @@ import type { ApplyResult } from "@/types/lobby";
 import { trimBungieName } from "@/lib/utils";
 import PlayerCard from "./PlayerCard";
 import RollSettingsPopover from "./RollSettingsPopover";
+import CaptainSettingsCard from "./CaptainSettingsCard";
 
 interface PlayerStat {
   userId: string;
@@ -327,6 +328,35 @@ export default function LobbyRoom({
       localStorage.setItem("gr_roll_prefs", JSON.stringify({ banned: [...bannedTypes], rerollLimit }));
     } catch { /* ignore */ }
   }, [bannedTypes, rerollLimit]);
+
+  // Publish the captain's roll settings onto the lobby row so non-captains can
+  // view them read-only (issue #106). The existing `lobbies` realtime
+  // subscription rebroadcasts the update to every client. Debounced so a burst
+  // of toggles (e.g. banning several types) collapses into a single write.
+  useEffect(() => {
+    if (!isCaptain) return;
+    const slotModeOf = (s: WeaponSlot): SlotMode =>
+      lockedSlots.has(s) ? "lock" : wildcardSlots.has(s) ? "wildcard" : "normal";
+    const settings: LobbyRollSettings = {
+      mode: rollMode,
+      rerollLimit,
+      noDup: noDupMode,
+      banned: [...bannedTypes],
+      slots: {
+        kinetic: slotModeOf("kinetic"),
+        energy: slotModeOf("energy"),
+        power: slotModeOf("power"),
+      },
+    };
+    const t = setTimeout(() => {
+      fetch("/api/lobby/roll-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lobbyId: lobby.id, settings }),
+      }).catch(() => { /* best-effort; non-captains just won't see the latest */ });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [isCaptain, lobby.id, rollMode, rerollLimit, noDupMode, bannedTypes, lockedSlots, wildcardSlots]);
 
   // Keep captainLocked in sync with real-time lobby updates
   useEffect(() => { setCaptainLocked(lobbyData.captain_locked ?? false); }, [lobbyData.captain_locked]);
@@ -1651,6 +1681,25 @@ export default function LobbyRoom({
                     onBannedTypesChange={setBannedTypes}
                     poolWeaponTypes={poolWeaponTypes}
                   />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Captain's settings (read-only) — shown to non-captains so they can
+              see the active roll config without being able to edit it (#106). */}
+          {!isCaptain && !isSpectator && (
+            <div className="order-2 border border-bungie-border/40 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setRollSettingsOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition"
+              >
+                <span>⚙️ Captain&apos;s Settings</span>
+                <span className="text-xs">{rollSettingsOpen ? "▲" : "▼"}</span>
+              </button>
+              {rollSettingsOpen && (
+                <div className="px-4 pb-4 pt-3 border-t border-bungie-border/40">
+                  <CaptainSettingsCard settings={lobbyData.roll_settings} />
                 </div>
               )}
             </div>
