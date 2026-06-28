@@ -110,7 +110,7 @@ export default function PlayerCard({ member, compact, variant = "default" }: Pro
           <span className="text-[11px] text-gray-300 leading-tight drop-shadow">spectating</span>
         ) : member.clan_name ? (
           <span className="text-[12px] text-gray-200/90 truncate leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-            {member.clan_tag ? `[${member.clan_tag}] ` : ""}{member.clan_name}
+            {member.clan_name}
           </span>
         ) : null}
       </div>
