@@ -103,15 +103,25 @@ export default function RollDetails({
   const myInstances = me?.instances ?? [];
   const chosenId = chosenInstances[activeTab];
   const myChosen = myInstances.find((i) => i.instanceId === chosenId) ?? myInstances[0];
-  // Which of your rolls drives your column — picked from the left rail.
+  // Which of your rolls drives your card — picked from the left rail.
   const myShown = myInstances.find((i) => i.instanceId === highlightId) ?? myChosen;
 
-  // The instance shown per member column: you = your picked roll, others = their first.
+  // The instance shown per member card: you = your picked roll, others = their first.
   const shownFor = (m: MemberRolls): RollInstance | undefined =>
     m.isMe ? myShown : m.instances[0];
 
   const statRows = BAR_STATS.filter((s) => base[s] !== undefined || members.some((m) => shownFor(m)?.stats[s] !== undefined));
   const numRows = NUM_STATS.filter((s) => s !== "RPM" && s !== "Magazine" && (base[s] !== undefined || (myShown && myShown.stats[s] !== undefined)));
+
+  // Team-best per stat, so the highest value across members can be highlighted
+  // in each card.
+  const bestPerStat: Record<string, number> = {};
+  for (const s of statRows) {
+    const vals = members
+      .map((m) => { const inst = shownFor(m); return inst ? inst.stats[s] ?? base[s] : undefined; })
+      .filter((v): v is number => v !== undefined);
+    if (vals.length) bestPerStat[s] = Math.max(...vals);
+  }
 
   // Reserve height for the tallest slot so switching tabs doesn't resize the panel and yank the page.
   const maxStatRows = Math.max(
@@ -133,8 +143,8 @@ export default function RollDetails({
 
   // A roll's socket icons (barrel, magazine, all perks, masterwork), each with
   // a hover tooltip describing exactly what it does. The large variant (used in
-  // the comparison columns) wraps and centers; the compact variant (left rail)
-  // stays on one line and groups sockets with thin separators.
+  // the member cards) wraps and centers; the compact variant (left rail) stays
+  // on one line and groups sockets with thin separators.
   const rollPreview = (inst: RollInstance, large = true) => {
     const cls = `${large ? "w-10 h-10" : "w-9 h-9"} rounded border border-bungie-blue/40 hover:border-bungie-blue cursor-help transition`;
     const barrel = <PerkIcon icon={inst.barrelIcon} name={inst.barrelName} className={cls} />;
@@ -162,6 +172,90 @@ export default function RollDetails({
         {perks.length > 0 && <div className="flex gap-1">{perks}</div>}
         {inst.masterworkIcon && sep}
         {masterwork}
+      </div>
+    );
+  };
+
+  // One self-contained card per member: emblem header, their roll, then their
+  // stat bars. Cards are emblem-width and lay out 3-per-row (see grid below).
+  const memberCard = (m: MemberRolls) => {
+    const card = memberCards?.[m.userId];
+    const inst = shownFor(m);
+    return (
+      <div key={m.userId} className="rounded-lg border border-bungie-border/60 bg-bungie-dark/30 overflow-hidden flex flex-col">
+        {/* Emblem header (fallback to name) */}
+        {card ? (
+          <PlayerCard member={card} />
+        ) : (
+          <div className="h-[4.5rem] flex items-center justify-center bg-bungie-dark border-b border-bungie-border/60 px-3">
+            <span className={`text-sm font-bold truncate ${m.isMe ? theme.text : "text-gray-200"}`}>
+              {m.isMe ? "You" : trimBungieName(m.displayName)}
+            </span>
+          </div>
+        )}
+
+        <div className="p-2.5 space-y-2 flex-1 flex flex-col">
+          {/* Roll perks */}
+          <div className="min-h-[2.75rem] flex flex-wrap gap-1 justify-center items-center">
+            {m.failed ? (
+              <span className="text-gray-500 text-[10px] italic">couldn&apos;t load</span>
+            ) : inst ? (
+              rollPreview(inst)
+            ) : (
+              <span className="text-gray-500 text-[10px]">—</span>
+            )}
+          </div>
+
+          {/* Stat rows */}
+          <div className="space-y-1.5 pt-2 border-t border-bungie-border/40">
+            {statRows.map((s) => {
+              const v = inst ? inst.stats[s] ?? base[s] : undefined;
+              if (v === undefined) {
+                return (
+                  <div key={s} className="flex items-center gap-1.5">
+                    <span className="w-14 text-gray-400 text-[10px] truncate">{s}</span>
+                    <div className="flex-1 h-1.5 bg-gray-700/40 rounded-full" />
+                    <span className="w-5 text-right text-gray-500 text-[11px]">—</span>
+                    <span className="w-6" />
+                  </div>
+                );
+              }
+              const isBest = members.length > 1 && v === bestPerStat[s];
+              const hasBase = base[s] !== undefined;
+              const delta = hasBase ? v - base[s] : 0;
+              // Segmented bar: element fill up to the lower of base/value, then
+              // the perk difference in green (gain) or red (loss).
+              const lo = Math.min(100, Math.max(0, Math.min(v, hasBase ? base[s] : v)));
+              const hi = Math.min(100, Math.max(0, Math.max(v, hasBase ? base[s] : v)));
+              return (
+                <div key={s} className="flex items-center gap-1.5">
+                  <span className="w-14 text-gray-400 text-[10px] truncate">{s}</span>
+                  <div className="flex-1 h-1.5 bg-gray-700/80 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-gray-400" style={{ width: `${lo}%` }} />
+                    {hi > lo && (
+                      <div className={`h-full ${delta >= 0 ? "bg-green-400" : "bg-red-500/80"}`} style={{ width: `${hi - lo}%` }} />
+                    )}
+                  </div>
+                  <span className={`w-5 text-right tabular-nums text-[11px] ${isBest ? `${theme.text} font-semibold` : "text-gray-300"}`}>{v}</span>
+                  {/* Always reserve the delta column so every bar lines up */}
+                  <span className={`w-6 text-right text-[9px] tabular-nums ${delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : "text-transparent"}`}>
+                    {m.isMe && delta !== 0 ? (delta > 0 ? `+${delta}` : delta) : ""}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Reserve height for the tallest slot so switching tabs doesn't resize the panel. */}
+            {Array.from({ length: Math.max(0, maxStatRows - statRows.length) }).map((_, i) => (
+              <div key={`pad-${i}`} className="flex items-center gap-1.5" aria-hidden="true">
+                <span className="w-14 text-[10px] invisible">—</span>
+                <div className="flex-1 h-1.5" />
+                <span className="w-5 text-[11px] invisible">—</span>
+                <span className="w-6" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -196,8 +290,8 @@ export default function RollDetails({
 
       <div className="px-3 py-3 flex gap-3">
         {/* Far-left rail: your rolls for this gun, scrollable. Click to pick
-            which one drives your column; star favorites it. */}
-        <div className="w-fit min-w-[13rem] max-w-[20rem] shrink-0 max-h-[22rem] overflow-y-auto pr-1 border-r border-bungie-border/50 space-y-1">
+            which one drives your card; star favorites it. */}
+        <div className="w-fit min-w-[13rem] max-w-[20rem] shrink-0 max-h-[24rem] overflow-y-auto pr-1 border-r border-bungie-border/50 space-y-1">
           <p className={`text-xs font-semibold px-1 mb-1 ${theme.text}`}>Your rolls</p>
           {myInstances.length === 0 ? (
             <p className="text-gray-500 text-[10px] px-1">{me?.failed ? "couldn't load" : "—"}</p>
@@ -239,102 +333,19 @@ export default function RollDetails({
           )}
         </div>
 
-        {/* Comparison: one column per member (you first), perks on top, stats below. */}
-        <div className="flex-1 min-w-0 overflow-x-auto">
-          <div
-            className="grid gap-x-3 gap-y-1.5 items-center"
-            style={{ gridTemplateColumns: `5.5rem repeat(${members.length}, minmax(14rem, 1fr))` }}
-          >
-            {/* Header row: each member's emblem player card (fallback to name).
-                The first card also spans the stat-label column so it starts
-                flush against the rolls rail, above the Impact/Range labels. */}
-            {members.map((m, idx) => {
-              const card = memberCards?.[m.userId];
-              return (
-                <div key={`h-${m.userId}`} className={`min-w-0 ${idx === 0 ? "col-span-2" : ""}`}>
-                  {card ? (
-                    <PlayerCard member={card} compact />
-                  ) : (
-                    <p className={`text-xs font-semibold truncate text-center ${m.isMe ? theme.text : "text-gray-200"}`}>
-                      {m.isMe ? "You" : trimBungieName(m.displayName)}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Divider */}
-            <div className="col-span-full h-px bg-bungie-border/50 my-1" />
-
-            {/* Perks row: each member's selected roll */}
-            <div className="text-gray-400 text-[10px] uppercase tracking-wide self-start pt-1">Roll</div>
-            {members.map((m) => {
-              const inst = shownFor(m);
-              return (
-                <div key={`roll-${m.userId}`} className="flex flex-wrap gap-1 justify-center">
-                  {m.failed ? (
-                    <span className="text-gray-500 text-[10px] italic">couldn&apos;t load</span>
-                  ) : inst ? (
-                    rollPreview(inst)
-                  ) : (
-                    <span className="text-gray-500 text-[10px]">—</span>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Stat rows: value per member, team-best highlighted */}
-            {statRows.map((s) => {
-              const vals = members.map((m) => {
-                const inst = shownFor(m);
-                return inst ? inst.stats[s] ?? base[s] : undefined;
-              });
-              const max = Math.max(...vals.filter((v): v is number => v !== undefined));
-              return (
-                <div key={s} className="contents">
-                  <div className="text-gray-400 text-[11px]">{s}</div>
-                  {members.map((m, i) => {
-                    const v = vals[i];
-                    if (v === undefined) return <div key={`${s}-${m.userId}`} className="text-center text-gray-500 text-[11px]">—</div>;
-                    const isBest = members.length > 1 && v === max;
-                    const hasBase = base[s] !== undefined;
-                    const delta = hasBase ? v - base[s] : 0;
-                    // Segmented bar: element fill up to the lower of base/value,
-                    // then the perk difference in green (gain) or red (loss).
-                    const lo = Math.min(100, Math.max(0, Math.min(v, hasBase ? base[s] : v)));
-                    const hi = Math.min(100, Math.max(0, Math.max(v, hasBase ? base[s] : v)));
-                    return (
-                      <div key={`${s}-${m.userId}`} className="flex items-center gap-1.5">
-                        <div className="flex-1 h-1.5 bg-gray-700/80 rounded-full overflow-hidden flex">
-                          <div className="h-full bg-gray-400" style={{ width: `${lo}%` }} />
-                          {hi > lo && (
-                            <div className={`h-full ${delta >= 0 ? "bg-green-400" : "bg-red-500/80"}`} style={{ width: `${hi - lo}%` }} />
-                          )}
-                        </div>
-                        <span className={`w-5 text-right tabular-nums text-[11px] ${isBest ? `${theme.text} font-semibold` : "text-gray-300"}`}>{v}</span>
-                        {/* Always reserve the delta column so every bar lines up */}
-                        <span className={`w-6 text-right text-[9px] tabular-nums ${delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : "text-transparent"}`}>
-                          {m.isMe && delta !== 0 ? (delta > 0 ? `+${delta}` : delta) : ""}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-
-            {/* Reserve height for the tallest slot so switching tabs doesn't resize the panel and yank the page. */}
-            {Array.from({ length: Math.max(0, maxStatRows - statRows.length) }).map((_, i) => (
-              <div key={`pad-${i}`} className="contents" aria-hidden="true">
-                <div className="text-gray-400 text-[11px] invisible">—</div>
-                {members.map((m) => (
-                  <div key={`pad-${i}-${m.userId}`} className="text-[11px] invisible">—</div>
-                ))}
-              </div>
-            ))}
+        {/* Comparison: a card per member, emblem-width, 3 per row. Members
+            beyond the first row scroll inside this fixed-height compartment. */}
+        <div className="flex-1 min-w-0">
+          <div className="max-h-[24rem] overflow-y-auto overflow-x-auto pr-1">
+            <div
+              className="grid gap-3 content-start justify-start"
+              style={{ gridTemplateColumns: "repeat(3, 22rem)" }}
+            >
+              {members.map((m) => memberCard(m))}
+            </div>
           </div>
 
-          {/* Intrinsic numeric stats (shared) */}
+          {/* Intrinsic numeric stats (shared across the fireteam) */}
           {anyNumRows && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-2 border-t border-bungie-border/50 min-h-[1.25rem]">
               {numRows.map((s) => (
