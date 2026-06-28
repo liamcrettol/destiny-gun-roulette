@@ -1,5 +1,18 @@
 import type { WeaponSlot } from "./bungie";
 
+// Per-slot roll behaviour the captain controls: Random / Locked / Your own.
+export type SlotMode = "normal" | "lock" | "wildcard";
+
+// The captain's active roll settings, persisted on the lobby so non-captains
+// can view them read-only (issue #106).
+export interface LobbyRollSettings {
+  mode: "normal" | "chaos" | "meta";
+  rerollLimit: number | null; // null = unlimited
+  noDup: boolean;
+  banned: string[];
+  slots: Record<WeaponSlot, SlotMode>;
+}
+
 export interface Lobby {
   id: string;
   code: string;
@@ -10,6 +23,7 @@ export interface Lobby {
   created_at: string;
   last_active_at?: string;
   captain_locked?: boolean;
+  roll_settings?: LobbyRollSettings | null;
 }
 
 export interface LobbyMember {
