@@ -198,7 +198,7 @@ export default function RollDetails({
 
         <div className="p-3 space-y-3 flex-1 flex flex-col">
           {/* Weapon icon + roll perks */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center gap-3">
             {slot.weaponIcon && (
               <WeaponIcon icon={slot.weaponIcon} watermark={slot.weaponWatermark} name={slot.weaponName ?? ""} size="large" />
             )}
