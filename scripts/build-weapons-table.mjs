@@ -33,6 +33,28 @@ const WEAPON_STAT_HASHES = {
   1931675084: "Inventory",
   3555269338: "Zoom",
 };
+
+// Comprehensive stat hash -> label map for perk investment stats.
+const PERK_STAT_HASHES = {
+  4284893193: "RPM",
+  4043523819: "Impact",
+  1240592695: "Range",
+  3614673599: "Blast Radius",
+  2523465841: "Velocity",
+  155624089: "Stability",
+  943549884: "Handling",
+  4188031367: "Reload",
+  1345609583: "Aim Assist",
+  3555269338: "Zoom",
+  3871231066: "Magazine",
+  2961396640: "Charge Time",
+  447667954: "Draw Time",
+  2837207746: "Swing Speed",
+  3022301683: "Charge Rate",
+  1842278586: "Shield Duration",
+  209426660: "Guard Resistance",
+  2762071195: "Guard Efficiency",
+};
 const TIER_NAMES = { 6: "Exotic", 5: "Legendary", 4: "Rare" };
 const DAMAGE_TYPE_NAMES = {
   3373582085: "Kinetic",
@@ -110,9 +132,15 @@ async function main() {
       const pcid = def.plug.plugCategoryIdentifier || "";
       if (COSMETIC_PLUG.test(pcid)) continue;
       perkNames[key] = def.displayProperties.name;
+      const investStats = {};
+      for (const is of (def.investmentStats ?? [])) {
+        const label = PERK_STAT_HASHES[is.statTypeHash];
+        if (label && is.value !== 0) investStats[label] = is.value;
+      }
       perkData[key] = {
         n: def.displayProperties.name,
         d: def.displayProperties.description || "",
+        ...(Object.keys(investStats).length > 0 ? { s: investStats } : {}),
       };
       if (def.displayProperties?.icon) {
         perkIcons[key] = CDN + def.displayProperties.icon;

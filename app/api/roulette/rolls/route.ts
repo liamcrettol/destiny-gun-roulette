@@ -36,7 +36,7 @@ const STAT_NAMES: Record<number, string> = {
   2762071195: "Guard Efficiency",
 };
 
-interface Perk { name: string; description: string }
+interface Perk { name: string; description: string; stats?: Record<string, number> }
 interface RollInstance {
   instanceId: string;
   location: "character" | "vault";
@@ -46,12 +46,15 @@ interface RollInstance {
   barrelHash?: number;
   barrelName?: string;
   barrelIcon?: string;
+  barrelStats?: Record<string, number>;
   magazineHash?: number;
   magazineName?: string;
   magazineIcon?: string;
+  magazineStats?: Record<string, number>;
   masterworkHash?: number;
   masterworkName?: string;
   masterworkIcon?: string;
+  masterworkStats?: Record<string, number>;
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -219,10 +222,13 @@ export async function POST(req: NextRequest) {
             perkIcons,
             barrelName: inst.barrelHash ? nameOf(inst.barrelHash) : undefined,
             barrelIcon: inst.barrelHash ? iconOf(inst.barrelHash) : undefined,
+            barrelStats: inst.barrelHash ? perkInfoMap.get(inst.barrelHash)?.stats : undefined,
             magazineName: inst.magazineHash ? nameOf(inst.magazineHash) : undefined,
             magazineIcon: inst.magazineHash ? iconOf(inst.magazineHash) : undefined,
+            magazineStats: inst.magazineHash ? perkInfoMap.get(inst.magazineHash)?.stats : undefined,
             masterworkName: inst.masterworkHash ? nameOf(inst.masterworkHash) : undefined,
             masterworkIcon: inst.masterworkHash ? iconOf(inst.masterworkHash) : undefined,
+            masterworkStats: inst.masterworkHash ? perkInfoMap.get(inst.masterworkHash)?.stats : undefined,
           };
         });
         memberRolls.push({ userId: m.userId, displayName: m.displayName, isMe: m.isMe, instances, failed: m.failed });

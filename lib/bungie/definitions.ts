@@ -43,7 +43,7 @@ const WEAPONS: Map<number, WeaponDefinition> = (() => {
 })();
 
 const PERK_NAMES = perkNamesRaw as unknown as Record<string, string>;
-const PERK_DATA = perkDataRaw as unknown as Record<string, { n: string; d: string }>;
+const PERK_DATA = perkDataRaw as unknown as Record<string, { n: string; d: string; s?: Record<string, number> }>;
 const PERK_ICONS = perkIconsRaw as unknown as Record<string, string>;
 
 // ── Weapon grouping ────────────────────────────────────────────────────────
@@ -83,14 +83,14 @@ export function getWeaponGroupHashes(itemHash: number): number[] {
   return GROUP_TO_HASHES.get(key) ?? [itemHash];
 }
 
-export interface PerkInfo { name: string; description: string }
+export interface PerkInfo { name: string; description: string; stats?: Record<string, number> }
 
 /** Resolve perk hashes to { name, description }. Unknown/cosmetic hashes are omitted. */
 export async function getPerkInfos(hashes: number[]): Promise<Map<number, PerkInfo>> {
   const result = new Map<number, PerkInfo>();
   for (const hash of hashes) {
     const d = PERK_DATA[hash.toString()];
-    if (d) result.set(hash, { name: d.n, description: d.d });
+    if (d) result.set(hash, { name: d.n, description: d.d, stats: d.s });
   }
   return result;
 }

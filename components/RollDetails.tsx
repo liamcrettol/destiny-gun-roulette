@@ -9,7 +9,7 @@ import PerkIcon from "./PerkIcon";
 import PlayerCard from "./PlayerCard";
 import WeaponIcon from "./WeaponIcon";
 
-export interface Perk { name: string; description: string }
+export interface Perk { name: string; description: string; stats?: Record<string, number> }
 export interface RollInstance {
   instanceId: string;
   location: "character" | "vault";
@@ -19,12 +19,15 @@ export interface RollInstance {
   barrelHash?: number;
   barrelName?: string;
   barrelIcon?: string;
+  barrelStats?: Record<string, number>;
   magazineHash?: number;
   magazineName?: string;
   magazineIcon?: string;
+  magazineStats?: Record<string, number>;
   masterworkHash?: number;
   masterworkName?: string;
   masterworkIcon?: string;
+  masterworkStats?: Record<string, number>;
   stats: Record<string, number>;
   lightLevel: number;
 }
@@ -149,12 +152,12 @@ export default function RollDetails({
   // on one line and groups sockets with thin separators.
   const rollPreview = (inst: RollInstance, large = true) => {
     const cls = `${large ? "w-12 h-12" : "w-9 h-9"} rounded border border-bungie-blue/40 hover:border-bungie-blue cursor-help transition`;
-    const barrel = <PerkIcon icon={inst.barrelIcon} name={inst.barrelName} className={cls} />;
-    const magazine = <PerkIcon icon={inst.magazineIcon} name={inst.magazineName} className={cls} />;
+    const barrel = <PerkIcon icon={inst.barrelIcon} name={inst.barrelName} stats={inst.barrelStats} className={cls} />;
+    const magazine = <PerkIcon icon={inst.magazineIcon} name={inst.magazineName} stats={inst.magazineStats} className={cls} />;
     const perks = inst.perkHashes.map((hash, i) => (
-      <PerkIcon key={hash} icon={inst.perkIcons[hash]} name={inst.perks[i]?.name} description={inst.perks[i]?.description} className={cls} />
+      <PerkIcon key={hash} icon={inst.perkIcons[hash]} name={inst.perks[i]?.name} description={inst.perks[i]?.description} stats={inst.perks[i]?.stats} className={cls} />
     ));
-    const masterwork = <PerkIcon icon={inst.masterworkIcon} name={inst.masterworkName} className={cls} />;
+    const masterwork = <PerkIcon icon={inst.masterworkIcon} name={inst.masterworkName} stats={inst.masterworkStats} className={cls} />;
 
     if (large) {
       return (

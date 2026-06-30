@@ -12,11 +12,13 @@ export default function PerkIcon({
   icon,
   name,
   description,
+  stats,
   className = "w-8 h-8 rounded border border-bungie-blue/40 hover:border-bungie-blue cursor-help transition",
 }: {
   icon?: string;
   name?: string;
   description?: string;
+  stats?: Record<string, number>;
   className?: string;
 }) {
   const ref = useRef<HTMLImageElement>(null);
@@ -36,7 +38,8 @@ export default function PerkIcon({
 
   if (!icon) return null;
 
-  const hasTip = Boolean(name || description);
+  const statEntries = stats ? Object.entries(stats).filter(([, v]) => v !== 0) : [];
+  const hasTip = Boolean(name || description || statEntries.length > 0);
   const title = !hasTip ? undefined : description ? `${name ?? ""} — ${description}` : name;
 
   return (
@@ -69,6 +72,18 @@ export default function PerkIcon({
           >
             {name && <div className="text-white text-xs font-semibold">{name}</div>}
             {description && <div className="text-gray-300 text-[11px] mt-0.5 leading-snug">{description}</div>}
+            {statEntries.length > 0 && (
+              <div className={`flex flex-col gap-0.5 ${description ? "mt-1.5 pt-1.5 border-t border-bungie-border/50" : "mt-0.5"}`}>
+                {statEntries.map(([stat, val]) => (
+                  <div key={stat} className="flex items-center justify-between gap-3">
+                    <span className="text-gray-400 text-[11px]">{stat}</span>
+                    <span className={`text-[11px] font-semibold tabular-nums ${val > 0 ? "text-green-400" : "text-red-400"}`}>
+                      {val > 0 ? `+${val}` : val}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>,
           document.body
         )}
