@@ -1149,164 +1149,169 @@ export default function LobbyRoom({
   // The shared weapon pool is viewable by every player. The captain can select
   // weapons into the loadout; everyone else gets a read-only browse view.
 
-  // Left rail: Fireteam · Your Guardian · Roll/Captain settings. Identity and
-  // configuration live here so the center can stay focused on the loadout.
-  const leftRail = (
-    <aside className="order-3 xl:order-1 flex flex-col w-full xl:w-60 shrink-0 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] gap-0 bg-bungie-surface border border-bungie-border/40 rounded-xl xl:overflow-y-auto">
-      {/* Fireteam */}
-      <div className="px-3 pt-3 pb-2">
-        <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Fireteam</p>
-        <div className="space-y-0.5">
-          {members.map((m) => (
-            <PlayerCard key={m.id} member={m} variant="sidebar" />
-          ))}
+  // Right column: Fireteam · Your Guardian · Settings stacked in a context card,
+  // with the shared Weapon Pool filling the remaining height beneath it. The main
+  // loadout column (below) occupies all the space to the left.
+  const rightColumn = (
+    <aside className="w-full xl:w-80 shrink-0 xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)] flex flex-col gap-3">
+      {/* Context: Fireteam + Your Guardian + Settings */}
+      <div className="shrink-0 bg-bungie-surface border border-bungie-border/40 rounded-xl">
+        {/* Fireteam */}
+        <div className="px-3 pt-3 pb-2">
+          <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Fireteam</p>
+          <div className="space-y-0.5">
+            {members.map((m) => (
+              <PlayerCard key={m.id} member={m} variant="sidebar" />
+            ))}
+          </div>
         </div>
+
+        {/* Guardian picker */}
+        {characters.length > 0 && !isSpectator && (
+          <>
+            <div className="mx-3 h-px bg-bungie-border/40" />
+            <div className="px-3 pt-2 pb-3">
+              <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Your Guardian</p>
+              <div className="space-y-1">
+                {[...characters]
+                  .sort((a, b) => CLASS_ORDER.indexOf(a.classType) - CLASS_ORDER.indexOf(b.classType))
+                  .map((c) => (
+                    <button
+                      key={c.characterId}
+                      onClick={() => handleSelectCharacter(c.characterId)}
+                      className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg border text-left transition ${
+                        selectedCharId === c.characterId
+                          ? "border-bungie-blue/50 bg-bungie-blue/10 text-white"
+                          : "border-transparent text-gray-400 hover:border-bungie-border hover:text-gray-300"
+                      }`}
+                    >
+                      <EmblemThumbnail emblemPath={c.emblemPath} classType={c.classType} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold leading-tight">{CLASS_NAMES[c.classType] ?? "Guardian"}</p>
+                        <p className="text-[10px] text-gray-500 leading-tight">Power {c.light}</p>
+                      </div>
+                      {selectedCharId === c.characterId && (
+                        <Check size={14} className="ml-auto shrink-0 text-green-400" />
+                      )}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Settings: captain edits roll settings; everyone else sees them read-only. */}
+        {!isSpectator && (isCaptain ? intersection != null : true) && (
+          <>
+            <div className="mx-3 h-px bg-bungie-border/40" />
+            <div className="px-3 pt-2 pb-3">
+              <button
+                onClick={() => setRollSettingsOpen((v) => !v)}
+                className="w-full flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gray-400 transition mb-2"
+              >
+                <SlidersHorizontal size={12} className="shrink-0" />
+                <span className="flex-1 text-left">{isCaptain ? "Roll Settings" : "Captain's Settings"}</span>
+                {isCaptain && bannedTypes.size > 0 && (
+                  <span className="text-yellow-500/80 normal-case tracking-normal">{bannedTypes.size} banned</span>
+                )}
+                <span className="text-[9px]">{rollSettingsOpen ? "▲" : "▼"}</span>
+              </button>
+              {rollSettingsOpen && (
+                isCaptain ? (
+                  <RollSettingsPopover
+                    inline
+                    anchorRef={{ current: null }}
+                    onClose={() => {}}
+                    rollMode={rollMode}
+                    onRollModeChange={setRollMode}
+                    rerollLimit={rerollLimit}
+                    onRerollLimitChange={setRerollLimit}
+                    rerollsUsed={rerollsUsed}
+                    noDupMode={noDupMode}
+                    onNoDupChange={setNoDupMode}
+                    bannedTypes={bannedTypes}
+                    onBannedTypesChange={setBannedTypes}
+                    poolWeaponTypes={poolWeaponTypes}
+                  />
+                ) : (
+                  <CaptainSettingsCard settings={lobbyData.roll_settings} />
+                )
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Guardian picker */}
-      {characters.length > 0 && !isSpectator && (
-        <>
-          <div className="mx-3 h-px bg-bungie-border/40" />
-          <div className="px-3 pt-2 pb-3">
-            <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Your Guardian</p>
-            <div className="space-y-1">
-              {[...characters]
-                .sort((a, b) => CLASS_ORDER.indexOf(a.classType) - CLASS_ORDER.indexOf(b.classType))
-                .map((c) => (
-                  <button
-                    key={c.characterId}
-                    onClick={() => handleSelectCharacter(c.characterId)}
-                    className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg border text-left transition ${
-                      selectedCharId === c.characterId
-                        ? "border-bungie-blue/50 bg-bungie-blue/10 text-white"
-                        : "border-transparent text-gray-400 hover:border-bungie-border hover:text-gray-300"
-                    }`}
-                  >
-                    <EmblemThumbnail emblemPath={c.emblemPath} classType={c.classType} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold leading-tight">{CLASS_NAMES[c.classType] ?? "Guardian"}</p>
-                      <p className="text-[10px] text-gray-500 leading-tight">Power {c.light}</p>
-                    </div>
-                    {selectedCharId === c.characterId && (
-                      <Check size={14} className="ml-auto shrink-0 text-green-400" />
-                    )}
-                  </button>
-                ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Settings: captain edits roll settings; everyone else sees them read-only. */}
-      {!isSpectator && (isCaptain ? intersection != null : true) && (
-        <>
-          <div className="mx-3 h-px bg-bungie-border/40" />
-          <div className="px-3 pt-2 pb-3">
-            <button
-              onClick={() => setRollSettingsOpen((v) => !v)}
-              className="w-full flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gray-400 transition mb-2"
-            >
-              <SlidersHorizontal size={12} className="shrink-0" />
-              <span className="flex-1 text-left">{isCaptain ? "Roll Settings" : "Captain's Settings"}</span>
-              {isCaptain && bannedTypes.size > 0 && (
-                <span className="text-yellow-500/80 normal-case tracking-normal">{bannedTypes.size} banned</span>
+      {/* Shared Weapon Pool — always open, fills the rest of the column. */}
+      {!isSpectator && (
+        <div className="flex-1 min-h-0 flex flex-col gap-2">
+          <div className="flex items-center justify-between shrink-0">
+            <h2 className="text-white font-semibold text-sm flex items-center gap-2">
+              Weapon Pool
+              {effectiveIntersection && (
+                <span className="text-xs font-normal text-gray-500">
+                  {effectiveIntersection.kinetic.length + effectiveIntersection.energy.length + effectiveIntersection.power.length} shared
+                </span>
               )}
-              <span className="text-[9px]">{rollSettingsOpen ? "▲" : "▼"}</span>
-            </button>
-            {rollSettingsOpen && (
-              isCaptain ? (
-                <RollSettingsPopover
-                  inline
-                  anchorRef={{ current: null }}
-                  onClose={() => {}}
-                  rollMode={rollMode}
-                  onRollModeChange={setRollMode}
-                  rerollLimit={rerollLimit}
-                  onRerollLimitChange={setRerollLimit}
-                  rerollsUsed={rerollsUsed}
-                  noDupMode={noDupMode}
-                  onNoDupChange={setNoDupMode}
-                  bannedTypes={bannedTypes}
-                  onBannedTypesChange={setBannedTypes}
-                  poolWeaponTypes={poolWeaponTypes}
-                />
-              ) : (
-                <CaptainSettingsCard settings={lobbyData.roll_settings} />
-              )
+            </h2>
+            {!isCaptain && (
+              <span className="text-[10px] uppercase tracking-wide text-gray-400 border border-bungie-border rounded px-1.5 py-0.5">
+                View only
+              </span>
             )}
           </div>
-        </>
+
+          {intersection ? (
+            <div className="flex-1 min-h-0">
+              <WeaponPool
+                fillHeight
+                intersection={effectiveIntersection ?? intersection}
+                weaponDetails={weaponDetails}
+                instancePerks={instancePerks}
+                collectionHashes={collectionHashes}
+                currentHashes={Object.fromEntries(slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash]))}
+                currentInstances={preferredInstances}
+                onSelectWeapon={(slot, hash, instanceId) => handleSelectWeapon(slot, hash, instanceId)}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                disabled={loadingAction !== null}
+                readOnly={!isCaptain}
+              />
+            </div>
+          ) : !isCaptain ? (
+            <div className="relative rounded-xl border-2 border-bungie-blue/60 bg-bungie-blue/10 p-4">
+              <span className="absolute -inset-px rounded-xl border border-bungie-blue/40 animate-pulse pointer-events-none" />
+              <p className="text-white text-sm font-semibold mb-1 flex items-center gap-1.5">
+                <Zap size={15} className="text-bungie-blue" /> Load your shared weapons
+              </p>
+              <p className="text-gray-400 text-xs mb-3 leading-snug">
+                Everyone needs to do this so the captain can roll a loadout you all own.
+              </p>
+              <button
+                onClick={() => handleLoadIntersection()}
+                disabled={loadingAction !== null}
+                className="w-full px-4 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
+              >
+                {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
+              </button>
+              {intersectionError && <p className="mt-2 text-xs text-red-400 break-all">{intersectionError}</p>}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-bungie-border/40 bg-bungie-surface p-4">
+              <p className="text-sm text-gray-500">
+                {loadingAction === "intersection" ? "Loading shared weapons…" : "Roll to load the shared weapon pool."}
+              </p>
+              {intersectionError && <p className="mt-2 text-xs text-red-400 break-all">{intersectionError}</p>}
+            </div>
+          )}
+        </div>
       )}
     </aside>
   );
 
-  // Right rail: the shared Weapon Pool browser, always open (no dropdown). For
-  // non-captains who haven't loaded their inventory yet, surface the load CTA.
-  const weaponPoolRail = !isSpectator ? (
-    <aside className="order-2 xl:order-3 w-full xl:w-80 shrink-0 xl:sticky xl:top-6 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-white font-semibold text-sm flex items-center gap-2">
-          Weapon Pool
-          {effectiveIntersection && (
-            <span className="text-xs font-normal text-gray-500">
-              {effectiveIntersection.kinetic.length + effectiveIntersection.energy.length + effectiveIntersection.power.length} shared
-            </span>
-          )}
-        </h2>
-        {!isCaptain && (
-          <span className="text-[10px] uppercase tracking-wide text-gray-400 border border-bungie-border rounded px-1.5 py-0.5">
-            View only
-          </span>
-        )}
-      </div>
-
-      {intersection ? (
-        <WeaponPool
-          intersection={effectiveIntersection ?? intersection}
-          weaponDetails={weaponDetails}
-          instancePerks={instancePerks}
-          collectionHashes={collectionHashes}
-          currentHashes={Object.fromEntries(slots.filter((s) => s.item_hash !== 0).map((s) => [s.slot, s.item_hash]))}
-          currentInstances={preferredInstances}
-          onSelectWeapon={(slot, hash, instanceId) => handleSelectWeapon(slot, hash, instanceId)}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-          disabled={loadingAction !== null}
-          readOnly={!isCaptain}
-        />
-      ) : !isCaptain ? (
-        <div className="relative rounded-xl border-2 border-bungie-blue/60 bg-bungie-blue/10 p-4">
-          <span className="absolute -inset-px rounded-xl border border-bungie-blue/40 animate-pulse pointer-events-none" />
-          <p className="text-white text-sm font-semibold mb-1 flex items-center gap-1.5">
-            <Zap size={15} className="text-bungie-blue" /> Load your shared weapons
-          </p>
-          <p className="text-gray-400 text-xs mb-3 leading-snug">
-            Everyone needs to do this so the captain can roll a loadout you all own.
-          </p>
-          <button
-            onClick={() => handleLoadIntersection()}
-            disabled={loadingAction !== null}
-            className="w-full px-4 py-2.5 bg-bungie-blue rounded-lg text-sm text-white font-semibold hover:opacity-90 disabled:opacity-50 transition"
-          >
-            {loadingAction === "intersection" ? "Loading…" : "Load Shared Weapons"}
-          </button>
-          {intersectionError && <p className="mt-2 text-xs text-red-400 break-all">{intersectionError}</p>}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-bungie-border/40 bg-bungie-surface p-4">
-          <p className="text-sm text-gray-500">
-            {loadingAction === "intersection" ? "Loading shared weapons…" : "Roll to load the shared weapon pool."}
-          </p>
-          {intersectionError && <p className="mt-2 text-xs text-red-400 break-all">{intersectionError}</p>}
-        </div>
-      )}
-    </aside>
-  ) : null;
-
   return (
     <div className="flex flex-col xl:flex-row gap-5 xl:items-start">
-      {leftRail}
-      <div className="order-1 xl:order-2 flex-1 min-w-0 flex flex-col gap-6">
+      <div className="flex-1 min-w-0 flex flex-col gap-6">
         {/* Header */}
         <div className="order-1 flex items-center justify-between gap-3">
           <div>
@@ -1679,7 +1684,7 @@ export default function LobbyRoom({
         )}
       </div>
 
-      {weaponPoolRail}
+      {rightColumn}
     </div>
   );
 }

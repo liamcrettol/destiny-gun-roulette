@@ -30,6 +30,9 @@ interface Props {
   // View-only mode for non-captains: the pool is browsable (search, filter,
   // hover for perks/stats) but weapons can't be selected into the loadout.
   readOnly?: boolean;
+  // Fill the parent's height (xl+) instead of capping at a fixed max-height —
+  // used when the pool occupies a full-height column.
+  fillHeight?: boolean;
   weaponSeals?: Record<number, {
     isInLoadout: boolean;
     isInYourRoll: boolean;
@@ -243,7 +246,7 @@ function WeaponCard({
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function WeaponPool({
-  intersection, weaponDetails, instancePerks, collectionHashes, currentHashes, currentInstances, onSelectWeapon, favorites, onToggleFavorite, disabled, readOnly, weaponSeals,
+  intersection, weaponDetails, instancePerks, collectionHashes, currentHashes, currentInstances, onSelectWeapon, favorites, onToggleFavorite, disabled, readOnly, weaponSeals, fillHeight,
 }: Props) {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<WeaponSlot>("kinetic");
@@ -296,7 +299,7 @@ export default function WeaponPool({
     <>
       {tooltipNode}
 
-      <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden flex flex-col max-h-[30rem]">
+      <div className={`bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden flex flex-col max-h-[30rem] ${fillHeight ? "xl:max-h-none xl:h-full" : ""}`}>
         {/* Header */}
         <div className="px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-1">
