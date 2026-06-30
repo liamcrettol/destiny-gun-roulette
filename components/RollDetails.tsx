@@ -7,6 +7,7 @@ import { trimBungieName } from "@/lib/utils";
 import type { LobbyMember } from "@/types/lobby";
 import PerkIcon from "./PerkIcon";
 import PlayerCard from "./PlayerCard";
+import WeaponIcon from "./WeaponIcon";
 
 export interface Perk { name: string; description: string }
 export interface RollInstance {
@@ -40,6 +41,7 @@ export interface SlotRolls {
   baseStats: Record<string, number>;
   weaponName?: string;
   weaponIcon?: string;
+  weaponWatermark?: string;
   members: MemberRolls[];
 }
 export type RollsData = Partial<Record<WeaponSlot, SlotRolls>>;
@@ -195,15 +197,20 @@ export default function RollDetails({
         )}
 
         <div className="p-3 space-y-3 flex-1 flex flex-col">
-          {/* Roll perks */}
-          <div className="min-h-[3.25rem] flex flex-wrap gap-1.5 justify-center items-center">
-            {m.failed ? (
-              <span className="text-gray-500 text-xs italic">couldn&apos;t load</span>
-            ) : inst ? (
-              rollPreview(inst)
-            ) : (
-              <span className="text-gray-500 text-xs">—</span>
+          {/* Weapon icon + roll perks */}
+          <div className="flex items-center gap-3">
+            {slot.weaponIcon && (
+              <WeaponIcon icon={slot.weaponIcon} watermark={slot.weaponWatermark} name={slot.weaponName ?? ""} size="large" />
             )}
+            <div className="min-h-[3rem] flex flex-wrap gap-1.5 items-center">
+              {m.failed ? (
+                <span className="text-gray-500 text-xs italic">couldn&apos;t load</span>
+              ) : inst ? (
+                rollPreview(inst)
+              ) : (
+                <span className="text-gray-500 text-xs">—</span>
+              )}
+            </div>
           </div>
 
           {/* Stat rows */}
