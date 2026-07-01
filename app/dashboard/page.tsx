@@ -20,7 +20,7 @@ export default async function Dashboard() {
   const activeSession = await getActiveSessionForUser(session.userId);
 
   return (
-    <main className="min-h-screen p-6 w-full max-w-3xl mx-auto">
+    <main className="min-h-screen p-6 w-full">
       <div className="relative overflow-hidden glass-card rounded-xl mb-8 animate-rise-in" style={{ opacity: 0 }}>
         <GlowBackdrop />
         <header className="flex items-center justify-between p-6">
@@ -47,13 +47,17 @@ export default async function Dashboard() {
         </Suspense>
       </div>
 
-      <div className="mt-8 space-y-6">
-        <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading leaderboard...</div>}>
-          <Leaderboard />
-        </Suspense>
-        <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading hall of fame...</div>}>
-          <WeaponHallOfFame />
-        </Suspense>
+      <div className="mt-8 grid lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading leaderboard...</div>}>
+            <Leaderboard />
+          </Suspense>
+        </div>
+        <div>
+          <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading hall of fame...</div>}>
+            <WeaponHallOfFame />
+          </Suspense>
+        </div>
       </div>
     </main>
   );
