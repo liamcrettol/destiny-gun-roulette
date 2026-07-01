@@ -300,11 +300,15 @@ export default function LobbyRoom({
   useEffect(() => { autoApplyRef.current = autoApply; }, [autoApply]);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
 
-  // Roll preferences (persisted in localStorage, captain-controlled)
-  const [rollMode, setRollMode] = useState<"normal" | "chaos" | "meta">("normal");
-  const [noDupMode, setNoDupMode] = useState(false);
+  // Roll preferences — initialized from lobby.roll_settings (set at creation), fall back to defaults
+  const [rollMode, setRollMode] = useState<"normal" | "chaos" | "meta">(
+    (lobby.roll_settings?.mode as "normal" | "chaos" | "meta") ?? "normal"
+  );
+  const [noDupMode, setNoDupMode] = useState(lobby.roll_settings?.noDup ?? false);
   const [bannedTypes, setBannedTypes] = useState<Set<string>>(new Set());
-  const [rerollLimit, setRerollLimit] = useState<number | null>(null); // null = unlimited
+  const [rerollLimit, setRerollLimit] = useState<number | null>(
+    lobby.roll_settings?.rerollLimit ?? null
+  );
   const [rerollsUsed, setRerollsUsed] = useState(0);
   const [showRollSettings, setShowRollSettings] = useState(false);
 
@@ -322,22 +326,21 @@ export default function LobbyRoom({
     recentRollsRef.current[slot] = [hash, ...hist.filter((h) => h !== hash)];
   }, []);
 
-  // Load saved roll prefs (banned types, reroll limit) once on mount. Mode is
-  // intentionally NOT persisted - it resets to Normal each time you enter a lobby.
+  // Load saved banned types from localStorage. Mode/rerollLimit/noDup come from
+  // lobby.roll_settings (set at creation) and are not overridden from localStorage.
   useEffect(() => {
     try {
       const raw = localStorage.getItem("gr_roll_prefs");
       if (!raw) return;
       const p = JSON.parse(raw);
       if (Array.isArray(p.banned)) setBannedTypes(new Set(p.banned));
-      if (p.rerollLimit === null || typeof p.rerollLimit === "number") setRerollLimit(p.rerollLimit);
     } catch { /* ignore */ }
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem("gr_roll_prefs", JSON.stringify({ banned: [...bannedTypes], rerollLimit }));
+      localStorage.setItem("gr_roll_prefs", JSON.stringify({ banned: [...bannedTypes] }));
     } catch { /* ignore */ }
-  }, [bannedTypes, rerollLimit]);
+  }, [bannedTypes]);
 
   // Keep captainLocked in sync with real-time lobby updates
   useEffect(() => { setCaptainLocked(lobbyData.captain_locked ?? false); }, [lobbyData.captain_locked]);

@@ -1,5 +1,5 @@
 import { adminSupabase } from "@/lib/supabase/admin";
-import type { Lobby, LobbyMember } from "@/types/lobby";
+import type { Lobby, LobbyMember, LobbyRollSettings } from "@/types/lobby";
 
 function generateCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -9,9 +9,20 @@ export async function createLobby(
   hostUserId: string,
   displayName: string,
   bungieMembershipType: number,
-  bungieMembershipId: string
+  bungieMembershipId: string,
+  initialSettings?: Partial<LobbyRollSettings> | null
 ): Promise<{ lobby: Lobby; member: LobbyMember }> {
   const code = generateCode();
+
+  const rollSettings: LobbyRollSettings | null = initialSettings
+    ? {
+        mode: initialSettings.mode ?? "normal",
+        rerollLimit: initialSettings.rerollLimit ?? null,
+        noDup: initialSettings.noDup ?? false,
+        banned: [],
+        slots: { kinetic: "normal", energy: "normal", power: "wildcard" },
+      }
+    : null;
 
   const { data: lobby, error: lobbyErr } = await adminSupabase
     .from("lobbies")
@@ -21,6 +32,7 @@ export async function createLobby(
       captain_user_id: hostUserId,
       status: "waiting",
       current_round: 1,
+      ...(rollSettings ? { roll_settings: rollSettings } : {}),
     })
     .select()
     .single();
