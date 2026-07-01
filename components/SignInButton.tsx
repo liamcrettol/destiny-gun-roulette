@@ -1,11 +1,15 @@
 "use client";
 
-export default function SignInButton() {
+export default function SignInButton({ returnTo }: { returnTo?: string } = {}) {
+  const href = returnTo
+    ? `/api/auth/bungie/login?returnTo=${encodeURIComponent(returnTo)}`
+    : "/api/auth/bungie/login";
+
   return (
     // OAuth entry point — must be a full navigation to the API route, not a client-side <Link>.
     // eslint-disable-next-line @next/next/no-html-link-for-pages
     <a
-      href="/api/auth/bungie/login"
+      href={href}
       className="w-full bg-bungie-blue hover:opacity-90 text-white font-semibold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">

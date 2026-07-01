@@ -27,7 +27,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
             You&apos;ve been invited to join lobby <span className="font-mono font-bold slashed-zero">{code}</span> - sign in to join.
           </p>
         )}
-        <SignInButton />
+        <SignInButton returnTo={code ? `/join/${code}` : undefined} />
         <p className="text-xs text-gray-500 text-center">
           Signing in lets us read your inventory and equip weapons. Everyone in the group needs to sign in.
         </p>
