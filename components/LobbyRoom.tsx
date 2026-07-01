@@ -1109,6 +1109,21 @@ export default function LobbyRoom({
 
   const handleSelectWeapon = useCallback(async (slot: WeaponSlot, hash: number, instanceId?: string) => {
     if (!intersection || !roundId) return;
+    // Warn (don't block) if this pick would put a Special ammo weapon in both
+    // kinetic and energy, since only one of those two would actually get used.
+    // Skip the check when the weapon in this slot isn't actually changing (the
+    // captain is just choosing a different roll/release of the same gun).
+    const currentHashInSlot = slots.find((s) => s.slot === slot)?.item_hash;
+    if ((slot === "kinetic" || slot === "energy") && hash !== currentHashInSlot) {
+      const isSpecial = (h?: number) => h !== undefined && h !== 0 && weaponDetails[h.toString()]?.ammoType === "Special";
+      const otherSlot: WeaponSlot = slot === "kinetic" ? "energy" : "kinetic";
+      const otherHash = slots.find((s) => s.slot === otherSlot)?.item_hash;
+      if (isSpecial(hash) && isSpecial(otherHash)) {
+        const otherName = weaponDetails[otherHash!.toString()]?.name ?? "your other weapon";
+        const ok = confirm(`You already have ${otherName} equipped as a Special weapon in the other slot. Picking this one too means no Primary in the loadout. Select it anyway?`);
+        if (!ok) return;
+      }
+    }
     animKindRef.current[slot] = "pick"; // animate as a manual pick, not a spin
     setLoadingAction("roll");
     setLastGameStats(null);
