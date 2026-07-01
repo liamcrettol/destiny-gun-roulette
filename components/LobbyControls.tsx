@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PlusCircle, LogIn } from "lucide-react";
 import type { Lobby } from "@/types/lobby";
 
 const STATUS_LABELS: Record<Lobby["status"], string> = {
@@ -46,14 +47,23 @@ export default function LobbyControls({ activeSession }: Props) {
   return (
     <div className="space-y-4">
       {activeSession && (
-        <div className="bg-bungie-surface border border-bungie-blue/50 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-white font-semibold text-sm">Active session detected</p>
-            <p className="text-gray-400 text-xs mt-0.5">
-              <span className="font-mono text-bungie-blue slashed-zero">{activeSession.code}</span>
-              {" · "}
-              {STATUS_LABELS[activeSession.status]}
-            </p>
+        <div
+          className="glass-card ring-1 ring-bungie-blue/40 rounded-xl p-4 flex items-center justify-between gap-4 animate-rise-in"
+          style={{ opacity: 0 }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bungie-blue opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-bungie-blue" />
+            </span>
+            <div>
+              <p className="text-white font-semibold text-sm">Active session detected</p>
+              <p className="text-gray-400 text-xs mt-0.5">
+                <span className="font-mono text-bungie-blue slashed-zero">{activeSession.code}</span>
+                {" · "}
+                {STATUS_LABELS[activeSession.status]}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => router.push(`/lobby/${activeSession.code}`)}
@@ -66,8 +76,12 @@ export default function LobbyControls({ activeSession }: Props) {
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Create */}
-        <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6 flex flex-col gap-4">
+        <div
+          className="glass-card rounded-xl p-6 flex flex-col gap-4 transition hover:-translate-y-1 hover:ring-1 hover:ring-bungie-blue/40 animate-rise-in"
+          style={{ opacity: 0, animationDelay: "80ms" }}
+        >
           <div>
+            <PlusCircle size={22} className="text-bungie-blue mb-2" />
             <h2 className="text-lg font-semibold text-white mb-1">Create Lobby</h2>
             <p className="text-gray-400 text-sm">
               Configure roll settings and share the code with your fireteam.
@@ -82,7 +96,11 @@ export default function LobbyControls({ activeSession }: Props) {
         </div>
 
         {/* Join */}
-        <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6">
+        <div
+          className="glass-card rounded-xl p-6 transition hover:-translate-y-1 hover:ring-1 hover:ring-bungie-blue/40 animate-rise-in"
+          style={{ opacity: 0, animationDelay: "160ms" }}
+        >
+          <LogIn size={22} className="text-bungie-blue mb-2" />
           <h2 className="text-lg font-semibold text-white mb-1">Join Lobby</h2>
           <p className="text-gray-400 text-sm mb-4">
             Got a code? Enter it here.

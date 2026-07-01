@@ -36,12 +36,22 @@ const config: Config = {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        "glow-drift": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)", opacity: "0.5" },
+          "50%":      { transform: "translate(3%, -4%) scale(1.08)", opacity: "0.8" },
+        },
+        "rise-in": {
+          "0%":   { transform: "translateY(12px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
       },
       animation: {
         "bounce-in": "bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
         "pick-pop":  "pick-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
         "slot-land": "slot-land 0.6s ease-out forwards",
         "fade-in":   "fade-in 0.15s ease-out forwards",
+        "glow-drift": "glow-drift 9s ease-in-out infinite",
+        "rise-in":   "rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards",
       },
     },
   },

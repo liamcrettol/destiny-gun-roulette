@@ -5,7 +5,9 @@ import SignOutButton from "@/components/SignOutButton";
 import LobbyControls from "@/components/LobbyControls";
 import Leaderboard from "@/components/Leaderboard";
 import WeaponHallOfFame from "@/components/WeaponHallOfFame";
+import DashboardStats from "@/components/DashboardStats";
 import DashboardLiveRefresh from "@/components/DashboardLiveRefresh";
+import GlowBackdrop from "@/components/GlowBackdrop";
 import { getActiveSessionForUser } from "@/lib/lobby";
 
 // Always render fresh so the global leaderboard reflects the latest games.
@@ -19,24 +21,33 @@ export default async function Dashboard() {
 
   return (
     <main className="min-h-screen p-6 w-full max-w-3xl mx-auto">
-      <header className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Gun Roulette</h1>
-          <p className="text-gray-400 text-sm">
-            Signed in as{" "}
-            <span className="text-bungie-blue font-medium">
-              {session.displayName}
-            </span>
-          </p>
-        </div>
-        <SignOutButton />
-      </header>
+      <div className="relative overflow-hidden glass-card rounded-xl mb-8 animate-rise-in" style={{ opacity: 0 }}>
+        <GlowBackdrop />
+        <header className="flex items-center justify-between p-6">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Gun Roulette</h1>
+            <p className="text-gray-400 text-sm">
+              Signed in as{" "}
+              <span className="text-bungie-blue font-medium">
+                {session.displayName}
+              </span>
+            </p>
+          </div>
+          <SignOutButton />
+        </header>
+      </div>
 
       <LobbyControls activeSession={activeSession} />
 
       <DashboardLiveRefresh />
 
-      <div className="mt-10 space-y-6">
+      <div className="mt-8">
+        <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading stats...</div>}>
+          <DashboardStats />
+        </Suspense>
+      </div>
+
+      <div className="mt-8 space-y-6">
         <Suspense fallback={<div className="text-gray-500 text-sm py-4">Loading leaderboard...</div>}>
           <Leaderboard />
         </Suspense>

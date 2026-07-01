@@ -1,6 +1,9 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import SignInButton from "@/components/SignInButton";
+import GlowBackdrop from "@/components/GlowBackdrop";
+import HeroReel from "@/components/HeroReel";
+import { Shuffle, Zap, Crown } from "lucide-react";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
   const session = await auth();
@@ -11,20 +14,29 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold tracking-tight text-white mb-2">
+    <main className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center gap-10 p-8">
+      <GlowBackdrop />
+
+      <div className="text-center animate-rise-in" style={{ opacity: 0 }}>
+        <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-white mb-3">
           Gun Roulette
         </h1>
-        <p className="text-gray-400 text-lg max-w-md">
+        <p className="text-gray-400 text-lg max-w-md mx-auto">
           Roll random loadouts for your whole fireteam and equip them in one click.
         </p>
       </div>
 
-      <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+      <div className="animate-rise-in" style={{ opacity: 0, animationDelay: "120ms" }}>
+        <HeroReel />
+      </div>
+
+      <div
+        className="flex flex-col items-center gap-4 w-full max-w-sm animate-rise-in"
+        style={{ opacity: 0, animationDelay: "200ms" }}
+      >
         {code && (
           <p className="text-sm text-bungie-blue text-center font-medium">
-            You&apos;ve been invited to join lobby <span className="font-mono font-bold slashed-zero">{code}</span> - sign in to join.
+            You&apos;ve been invited to join lobby <span className="font-mono font-bold slashed-zero">{code}</span>. Sign in to join.
           </p>
         )}
         <SignInButton returnTo={code ? `/join/${code}` : undefined} />
@@ -33,15 +45,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-8 max-w-2xl text-center">
+      <div className="grid grid-cols-3 gap-4 mt-4 max-w-2xl w-full text-center">
         {[
-          { icon: "🎲", title: "Random Rolls", desc: "Only rolls weapons everyone has" },
-          { icon: "⚡", title: "Auto-Equip", desc: "Equips the whole fireteam at once" },
-          { icon: "👑", title: "Turn Rotation", desc: "Roll control rotates every game" },
-        ].map((f) => (
-          <div key={f.title} className="bg-bungie-surface rounded-lg p-4 border border-bungie-border">
-            <div className="text-3xl mb-2">{f.icon}</div>
-            <div className="font-semibold text-white">{f.title}</div>
+          { Icon: Shuffle, title: "Random Rolls", desc: "Only rolls weapons everyone has" },
+          { Icon: Zap, title: "Auto-Equip", desc: "Equips the whole fireteam at once" },
+          { Icon: Crown, title: "Turn Rotation", desc: "Roll control rotates every game" },
+        ].map((f, i) => (
+          <div
+            key={f.title}
+            className="glass-card rounded-xl p-4 transition hover:-translate-y-1 hover:border-bungie-blue/50 animate-rise-in"
+            style={{ opacity: 0, animationDelay: `${280 + i * 80}ms` }}
+          >
+            <f.Icon size={26} className="mx-auto mb-2 text-bungie-blue" />
+            <div className="font-semibold text-white text-sm">{f.title}</div>
             <div className="text-xs text-gray-400 mt-1">{f.desc}</div>
           </div>
         ))}

@@ -1,5 +1,6 @@
 import { adminSupabase } from "@/lib/supabase/admin";
 import Image from "next/image";
+import { Crown } from "lucide-react";
 
 type HallOfFameEntry = {
   item_hash: number;
@@ -23,21 +24,21 @@ export default async function WeaponHallOfFame() {
 
   if (error || !data?.length) {
     return (
-      <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6 text-center">
+      <div className="glass-card rounded-xl p-6 text-center">
         <p className="text-gray-500 text-sm">No weapon data yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-bungie-surface border border-bungie-border rounded-xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-bungie-border">
+    <div className="glass-card rounded-xl overflow-hidden animate-rise-in" style={{ opacity: 0, animationDelay: "80ms" }}>
+      <div className="px-4 py-3 border-b border-bungie-border/60">
         <h2 className="text-lg font-semibold text-white">Weapon Hall of Fame</h2>
         <p className="text-xs text-gray-500 mt-0.5">Top roulette weapons by total kills</p>
       </div>
       <div className="divide-y divide-bungie-border/40">
         {data.map((e, i) => (
-          <div key={e.item_hash} className="flex items-center gap-3 px-4 py-3">
+          <div key={e.item_hash} className={`flex items-center gap-3 px-4 py-3 ${i === 0 ? "bg-yellow-400/5" : ""}`}>
             <span className="text-gray-400 font-mono text-sm w-5 text-right shrink-0">{i + 1}</span>
             <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden bg-bungie-dark">
               {e.weapon_icon ? (
@@ -53,8 +54,9 @@ export default async function WeaponHallOfFame() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`font-medium text-sm truncate ${i === 0 ? "text-yellow-400" : "text-white"}`}>
-                {i === 0 ? "👑 " : ""}{e.weapon_name ?? "Unknown Weapon"}
+              <p className={`font-medium text-sm truncate flex items-center gap-1 ${i === 0 ? "text-yellow-400" : "text-white"}`}>
+                {i === 0 && <Crown size={13} className="shrink-0" />}
+                {e.weapon_name ?? "Unknown Weapon"}
               </p>
               <p className={`text-xs ${TIER_COLOR[e.weapon_type ?? ""] ?? "text-gray-400"}`}>
                 {e.weapon_type ?? "Unknown"}

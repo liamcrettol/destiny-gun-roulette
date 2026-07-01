@@ -19,7 +19,7 @@ export default async function Leaderboard() {
 
   if (!data?.length) {
     return (
-      <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6 text-center">
+      <div className="glass-card rounded-xl p-6 text-center">
         <p className="text-gray-500 text-sm">No games yet.</p>
       </div>
     );
@@ -53,7 +53,7 @@ export default async function Leaderboard() {
   );
 
   return (
-    <div className="bg-bungie-surface border border-bungie-border rounded-xl p-6">
+    <div className="glass-card rounded-xl p-6 animate-rise-in" style={{ opacity: 0 }}>
       <h2 className="text-lg font-semibold text-white mb-4">Leaderboard</h2>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -69,7 +69,7 @@ export default async function Leaderboard() {
           </thead>
           <tbody className="divide-y divide-bungie-border/40">
             {entries.map((e, i) => (
-              <tr key={e.user_id} className={i === 0 ? "text-yellow-400" : "text-gray-300"}>
+              <tr key={e.user_id} className={i === 0 ? "text-yellow-400 bg-yellow-400/5" : "text-gray-300"}>
                 <td className="py-2 pr-4 text-gray-500 font-mono">{i + 1}</td>
                 <td className="py-2 pr-4 font-medium">
                   <Link href={`/stats/${e.user_id}`} className="hover:text-bungie-blue transition">
