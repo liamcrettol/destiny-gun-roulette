@@ -87,7 +87,7 @@ export default function NewLobbyPage() {
 
   return (
     <div className="min-h-screen bg-bungie-dark">
-      <div className="max-w-lg mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition mb-6"
@@ -101,63 +101,65 @@ export default function NewLobbyPage() {
           Configure your roll settings, then share the lobby code with your fireteam.
         </p>
 
-        <div className="space-y-6">
-          {/* Roll Mode */}
-          <div className="bg-bungie-surface border border-bungie-border rounded-xl p-5">
-            <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Roll Mode</p>
-            <div className="flex gap-2">
-              {(["normal", "chaos", "meta"] as RollMode[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setRollMode(m)}
-                  className={`flex-1 py-2 text-sm rounded-lg border capitalize transition ${
-                    rollMode === m
-                      ? "border-bungie-blue bg-bungie-blue/20 text-white font-semibold"
-                      : "border-bungie-border text-gray-400 hover:border-gray-400"
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-gray-600 mt-2">
-              {rollMode === "normal" && "Each player gets the same 3-slot loadout."}
-              {rollMode === "chaos" && "Each player rolls independently — everyone gets different weapons."}
-              {rollMode === "meta" && "Rolls are weighted toward higher-usage weapons."}
-            </p>
-          </div>
-
-          {/* Rerolls per round */}
-          <div className="bg-bungie-surface border border-bungie-border rounded-xl p-5">
-            <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Rerolls per Round</p>
-            <div className="flex gap-2">
-              {([null, 1, 3, 5] as (number | null)[]).map((v) => (
-                <button
-                  key={String(v)}
-                  onClick={() => setRerollLimit(v)}
-                  className={`flex-1 py-2 text-sm rounded-lg border transition ${
-                    rerollLimit === v
-                      ? "border-bungie-blue bg-bungie-blue/20 text-white font-semibold"
-                      : "border-bungie-border text-gray-400 hover:border-gray-400"
-                  }`}
-                >
-                  {v === null ? "∞" : v}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* No duplicates */}
-          <div className="bg-bungie-surface border border-bungie-border rounded-xl p-5">
-            <label className="flex items-center justify-between cursor-pointer select-none">
-              <div>
-                <p className="text-sm text-white font-medium">No duplicate weapon types</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  Prevents the same weapon type from appearing in multiple slots.
-                </p>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            {/* Roll Mode */}
+            <div className="bg-bungie-surface border border-bungie-border rounded-xl p-5">
+              <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Roll Mode</p>
+              <div className="flex gap-2">
+                {(["normal", "chaos", "meta"] as RollMode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setRollMode(m)}
+                    className={`flex-1 py-2 text-sm rounded-lg border capitalize transition ${
+                      rollMode === m
+                        ? "border-bungie-blue bg-bungie-blue/20 text-white font-semibold"
+                        : "border-bungie-border text-gray-400 hover:border-gray-400"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
               </div>
-              <PillSwitch checked={noDup} onChange={() => setNoDup((v) => !v)} />
-            </label>
+              <p className="text-[11px] text-gray-600 mt-2">
+                {rollMode === "normal" && "Each player gets the same 3-slot loadout."}
+                {rollMode === "chaos" && "Each player rolls independently — everyone gets different weapons."}
+                {rollMode === "meta" && "Rolls are weighted toward higher-usage weapons."}
+              </p>
+            </div>
+
+            {/* Rerolls per round */}
+            <div className="bg-bungie-surface border border-bungie-border rounded-xl p-5">
+              <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Rerolls per Round</p>
+              <div className="flex gap-2">
+                {([null, 1, 3, 5] as (number | null)[]).map((v) => (
+                  <button
+                    key={String(v)}
+                    onClick={() => setRerollLimit(v)}
+                    className={`flex-1 py-2 text-sm rounded-lg border transition ${
+                      rerollLimit === v
+                        ? "border-bungie-blue bg-bungie-blue/20 text-white font-semibold"
+                        : "border-bungie-border text-gray-400 hover:border-gray-400"
+                    }`}
+                  >
+                    {v === null ? "∞" : v}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* No duplicates */}
+            <div className="bg-bungie-surface border border-bungie-border rounded-xl p-5">
+              <label className="flex items-center justify-between cursor-pointer select-none">
+                <div>
+                  <p className="text-sm text-white font-medium">No duplicate weapon types</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Prevents the same weapon type from appearing in multiple slots.
+                  </p>
+                </div>
+                <PillSwitch checked={noDup} onChange={() => setNoDup((v) => !v)} />
+              </label>
+            </div>
           </div>
 
           {/* Ban weapon types */}
@@ -204,17 +206,17 @@ export default function NewLobbyPage() {
               </p>
             )}
           </div>
-
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-
-          <button
-            onClick={handleCreate}
-            disabled={loading}
-            className="w-full bg-bungie-blue hover:opacity-90 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition text-sm"
-          >
-            {loading ? "Creating..." : "Create Lobby"}
-          </button>
         </div>
+
+        {error && <p className="text-red-400 text-sm text-center mt-6">{error}</p>}
+
+        <button
+          onClick={handleCreate}
+          disabled={loading}
+          className="w-full mt-6 bg-bungie-blue hover:opacity-90 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition text-sm"
+        >
+          {loading ? "Creating..." : "Create Lobby"}
+        </button>
       </div>
     </div>
   );
