@@ -115,7 +115,7 @@ function WeaponCard({
   onSelect: (hash: number, instanceId?: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
-  onHover: (hash: number, el: HTMLElement) => void; onLeave: () => void;
+  onHover: (hash: number, e: React.MouseEvent<HTMLElement>) => void; onLeave: () => void;
   favoritedInstance?: string;
   onToggleFavorite?: (instanceId: string) => void;
   seals?: {
@@ -185,7 +185,7 @@ function WeaponCard({
       className={`rounded-lg border overflow-hidden transition ${
         isActive ? `${theme.border} ring-1 ${theme.ring}` : tier.border
       }`}
-      onMouseEnter={(e) => onHover(hash, e.currentTarget)}
+      onMouseEnter={(e) => onHover(hash, e)}
       onMouseLeave={onLeave}
     >
       {/* Main card row. Read-only viewers get a static row (still hoverable for

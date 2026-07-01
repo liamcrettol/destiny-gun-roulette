@@ -211,7 +211,7 @@ export default function LoadoutQueue({
           return (
             <div
               key={slotName}
-              onMouseEnter={hasWeapon ? (e) => onHover(slot!.item_hash, e.currentTarget) : undefined}
+              onMouseEnter={hasWeapon ? (e) => onHover(slot!.item_hash, e) : undefined}
               onMouseLeave={hasWeapon ? onLeave : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${
                 idx > 0 ? "border-t border-bungie-border/30" : ""

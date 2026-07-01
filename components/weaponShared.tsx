@@ -74,8 +74,8 @@ export function sortWeapons(hashes: number[], details: Record<string, WeaponDeta
 // Anchored to the hovered card (captured once on mouseenter) rather than
 // tracking the cursor, so it sits still instead of jittering around.
 
-export interface AnchorRect { top: number; left: number; right: number; width: number; height: number }
-export interface TooltipState { hash: number; rect: AnchorRect }
+export interface CursorPoint { x: number; y: number }
+export interface TooltipState { hash: number; point: CursorPoint }
 
 function FloatingTooltip({
   state,
@@ -93,25 +93,22 @@ function FloatingTooltip({
 
   const detail = weaponDetails[state.hash.toString()];
 
-  // Prefer placing the tooltip to the LEFT of the card (the browser lives in a
-  // right-hand sidebar); flip to the right and clamp vertically if needed.
+  // Anchor next to wherever the cursor actually is, not the hovered card's
+  // position - the card can span the full width of a panel, and anchoring to
+  // its edge pins the tooltip against the sidebar, covering the fireteam list.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const { width, height } = el.getBoundingClientRect();
-    const { rect } = state;
+    const { point } = state;
     const pad = 12;
-    const gap = 12;
+    const gap = 16;
 
-    let left = rect.left - width - gap;
-    if (left < pad) left = rect.right + gap;
-    if (left + width + pad > window.innerWidth) {
-      left = Math.max(pad, window.innerWidth - width - pad);
-    }
-    left = Math.max(pad, left);
+    let left = point.x + gap;
+    if (left + width + pad > window.innerWidth) left = point.x - width - gap;
+    left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
 
-    // Vertically center on the card, then clamp into the viewport.
-    let top = rect.top + rect.height / 2 - height / 2;
+    let top = point.y - height / 2;
     top = Math.max(pad, Math.min(top, window.innerHeight - height - pad));
 
     setPos({ left, top });
@@ -130,7 +127,7 @@ function FloatingTooltip({
     <div
       ref={ref}
       className="fixed z-[60] w-72 bg-gray-950/95 backdrop-blur border border-bungie-border rounded-xl shadow-2xl pointer-events-none overflow-hidden"
-      style={{ left: pos?.left ?? state.rect.left, top: pos?.top ?? state.rect.top, opacity: pos ? 1 : 0 }}
+      style={{ left: pos?.left ?? state.point.x, top: pos?.top ?? state.point.y, opacity: pos ? 1 : 0 }}
     >
       {/* Rarity accent bar */}
       <div className={`h-1 w-full ${tier.accent}`} />
@@ -206,10 +203,9 @@ export function useWeaponTooltip(
 ) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Capture the anchor element's rect once, on enter - no per-move updates.
-  const onHover = useCallback((hash: number, el: HTMLElement) => {
-    const r = el.getBoundingClientRect();
-    setTooltip({ hash, rect: { top: r.top, left: r.left, right: r.right, width: r.width, height: r.height } });
+  // Capture the cursor position once, on enter - no per-move updates.
+  const onHover = useCallback((hash: number, e: React.MouseEvent<HTMLElement>) => {
+    setTooltip({ hash, point: { x: e.clientX, y: e.clientY } });
   }, []);
   const onLeave = useCallback(() => setTooltip(null), []);
 
