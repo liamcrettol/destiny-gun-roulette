@@ -17,8 +17,9 @@ export default function SignOutButton() {
       <button
         onClick={() => signOut({ callbackUrl: "/" })}
         className="text-sm text-gray-400 hover:text-white transition"
+        title="Fully sign out — you'll need to sign back in to use the app"
       >
-        Sign out
+        Sign out completely
       </button>
     </div>
   );
