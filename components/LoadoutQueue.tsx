@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Shuffle, Lock, User } from "lucide-react";
+import { Shuffle, Lock, User, RotateCcw } from "lucide-react";
 import type { LobbyLoadoutSlot } from "@/types/lobby";
 import type { WeaponSlot } from "@/types/bungie";
 import { type WeaponDetail, type InstancePerk, type DamageTheme, useWeaponTooltip, damageTheme } from "./weaponShared";
@@ -270,20 +270,20 @@ export default function LoadoutQueue({
 
               {/* Captain controls */}
               {showControls && (
-                <div className="shrink-0 flex items-center gap-1.5">
+                <div className="shrink-0 flex items-center gap-2">
                   {onCycleSlotMode && (
                     <button
                       onClick={() => onCycleSlotMode(slotName as WeaponSlot)}
                       title="Click to cycle: Random → Locked → Your own"
-                      className={`text-[10px] px-2 py-0.5 rounded-full border transition inline-flex items-center gap-1 ${
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition inline-flex items-center gap-1.5 font-medium ${
                         slotMode === "lock"
-                          ? "border-yellow-500/60 bg-yellow-500/10 text-yellow-300"
+                          ? "border-yellow-500/70 bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/25"
                           : slotMode === "wildcard"
-                          ? "border-purple-500/60 bg-purple-500/10 text-purple-300"
-                          : "border-bungie-border/40 text-gray-500 hover:border-gray-500"
+                          ? "border-purple-500/70 bg-purple-500/15 text-purple-300 hover:bg-purple-500/25"
+                          : "border-bungie-border text-gray-400 hover:border-gray-400 hover:text-gray-200"
                       }`}
                     >
-                      <ModeIcon size={11} className="shrink-0" />
+                      <ModeIcon size={13} className="shrink-0" />
                       {slotMode === "normal" ? "Random" : slotMode === "lock" ? "Locked" : "Yours"}
                     </button>
                   )}
@@ -291,9 +291,9 @@ export default function LoadoutQueue({
                     <button
                       onClick={(e) => { e.stopPropagation(); onRerollSlot(slotName as WeaponSlot); }}
                       title={`Reroll ${slotName}`}
-                      className="w-6 h-6 shrink-0 inline-flex items-center justify-center rounded-full border border-bungie-border/40 text-gray-500 hover:border-bungie-blue hover:text-bungie-blue transition text-[11px]"
+                      className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-lg border border-bungie-border text-gray-400 hover:border-bungie-blue hover:text-bungie-blue transition"
                     >
-                      ↺
+                      <RotateCcw size={13} />
                     </button>
                   )}
                 </div>
