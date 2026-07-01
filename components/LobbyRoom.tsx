@@ -13,28 +13,9 @@ import WeaponPool from "./WeaponPool";
 import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
 import { trimBungieName } from "@/lib/utils";
+import { useGameDetection, type PlayerStat, type RoundRecord } from "@/hooks/useGameDetection";
 import PlayerCard from "./PlayerCard";
 import { Shuffle, Zap, Crown, Check, Copy, X, MoreHorizontal, Lock, User, PanelRightOpen, PanelRightClose, Clock } from "lucide-react";
-
-interface PlayerStat {
-  userId: string;
-  displayName: string;
-  kills: number;
-  deaths: number;
-  assists: number;
-  kd: number;
-  rouletteWeaponKills: number;
-  won?: boolean | null;
-}
-
-interface RoundRecord {
-  sessionId: string;
-  playedAt: string;
-  roundNum: number;
-  stats: PlayerStat[];
-  weapons?: Record<string, { name: string; icon: string }>;
-  mapName?: string | null;
-}
 
 interface LeaderboardEntry {
   userId: string;
@@ -59,11 +40,6 @@ const CLASS_NAMES: Record<number, string> = { 0: "Titan", 1: "Hunter", 2: "Warlo
 // Display order for the character picker: Warlock, Hunter, Titan (left to right).
 const CLASS_ORDER = [2, 1, 0];
 const SLOT_LABELS: Record<WeaponSlot, string> = { kinetic: "Kinetic", energy: "Energy", power: "Power" };
-// How often each client checks Bungie for the finished game. The PGCR takes a
-// couple minutes to appear on Bungie's side; once it does, a tight interval
-// grabs it fast. Every fireteam member that has the page open polls, so the
-// first one to see it records and pushes to everyone via realtime.
-const POLL_INTERVAL_MS = 10_000;
 
 const LOBBY_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   waiting: { label: "Waiting", cls: "border-bungie-border text-gray-400" },
@@ -268,20 +244,28 @@ export default function LobbyRoom({
   const [intersectionError, setIntersectionError] = useState<string | null>(null);
   const [lockedSlots, setLockedSlots] = useState<Set<WeaponSlot>>(new Set());
   const [wildcardSlots, setWildcardSlots] = useState<Set<WeaponSlot>>(new Set<WeaponSlot>(["power"]));
-  // Current game results (prominent card, clears when captain rolls)
-  const [lastGameStats, setLastGameStats] = useState<PlayerStat[] | null>(null);
-  // All past rounds for scrollable history
-  const [roundHistory, setRoundHistory] = useState<RoundRecord[]>([]);
-  const [expandedRound, setExpandedRound] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedWatch, setCopiedWatch] = useState(false);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasAutoSelected = useRef(false);
 
   // Stats panel tab: session totals | match history | global leaderboard
   const [statsTab, setStatsTab] = useState<"session" | "history" | "leaderboard">("session");
+  const {
+    polling,
+    lastGameStats,
+    setLastGameStats,
+    roundHistory,
+    expandedRound,
+    setExpandedRound,
+    fetchHistory,
+    startPolling,
+    stopPolling,
+  } = useGameDetection({
+    lobbyId: lobby.id,
+    status: lobbyData.status,
+    onSwitchToHistoryTab: () => setStatsTab("history"),
+  });
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
@@ -565,68 +549,6 @@ export default function LobbyRoom({
   const captainMember = members.find((m) => m.is_captain);
   const captainName = captainMember ? trimBungieName(captainMember.display_name) : null;
 
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    setPolling(false);
-  }, []);
-
-  const fetchHistory = useCallback(async (switchTab?: boolean) => {
-    const res = await fetch(`/api/stats/history?lobbyId=${lobby.id}`);
-    const data = await res.json();
-    if (data.rounds) {
-      setRoundHistory(data.rounds);
-      if (data.rounds.length > 0) {
-        setExpandedRound(data.rounds[data.rounds.length - 1].sessionId);
-        if (switchTab) setStatsTab("history");
-      }
-    }
-  }, [lobby.id]);
-
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
-
-  const detectGameEnd = useCallback(async () => {
-    try {
-      const res = await fetch("/api/stats/detect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lobbyId: lobby.id }),
-      });
-      const data = await res.json();
-      if (data.done && data.stats) {
-        stopPolling();
-        setLastGameStats(data.stats);
-        fetchHistory(true);
-        // Per-round state is cleared by the prevRoundIdRef effect when roundId changes.
-      }
-      // If a game is pending but not yet found, return whether we should poll
-      return data.pending ?? false;
-    } catch {
-      // ignore poll errors
-      return false;
-    }
-  }, [lobby.id, stopPolling, fetchHistory]);
-
-  const startPolling = useCallback(() => {
-    if (pollTimerRef.current) return;
-    setPolling(true);
-    detectGameEnd();
-    pollTimerRef.current = setInterval(detectGameEnd, POLL_INTERVAL_MS);
-  }, [detectGameEnd]);
-
-  useEffect(() => () => stopPolling(), [stopPolling]);
-
-  // When a loadout is applied (status flips to in_game, seen via realtime by
-  // every member), everyone starts polling - so whoever's PGCR appears first
-  // records it and pushes to the rest. startPolling is a no-op if already running.
-  useEffect(() => {
-    if (lobbyData.status === "in_game") startPolling();
-  }, [lobbyData.status, startPolling]);
-
   // When the leader ends the session, the lobby status flips to "done" via
   // realtime — redirect all remaining members back to the dashboard.
   useEffect(() => {
@@ -636,15 +558,6 @@ export default function LobbyRoom({
       router.refresh();
     }
   }, [lobbyData.status, router, stopPolling]);
-
-  // On mount: check if a game was in progress when everyone left the lobby.
-  // If detect says pending=true, start polling so we catch up automatically.
-  useEffect(() => {
-    detectGameEnd().then((pending) => {
-      if (pending) startPolling();
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const channel = supabase
@@ -677,15 +590,6 @@ export default function LobbyRoom({
         (payload) => {
           const deletedId = (payload.old as { id?: string }).id;
           if (deletedId) setMembers((prev) => prev.filter((m) => m.id !== deletedId));
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "game_sessions", filter: `lobby_id=eq.${lobby.id}` },
-        () => {
-          // Refresh history for all clients when a new game is logged
-          fetchHistory();
-          if (!lastGameStats) detectGameEnd();
         }
       )
       .on(
@@ -1068,7 +972,7 @@ export default function LobbyRoom({
     });
     setRerollsUsed((n) => n + 1);
     setLoadingAction(null);
-  }, [intersection, effectiveIntersection, roundId, lobby.id, slots, weaponDetails, lockedSlots, wildcardSlots, rollMode, noDupMode, rerollExhausted]);
+  }, [intersection, effectiveIntersection, roundId, lobby.id, slots, weaponDetails, lockedSlots, wildcardSlots, rollMode, noDupMode, rerollExhausted, setLastGameStats]);
 
   const handleApply = useCallback(async () => {
     if (!selectedCharId || !roundId) return;
@@ -1153,7 +1057,7 @@ export default function LobbyRoom({
       body: JSON.stringify({ lobbyId: lobby.id, roundId, intersection, weaponDetails, keepSlots: keep }),
     });
     setLoadingAction(null);
-  }, [intersection, roundId, lobby.id, slots, weaponDetails]);
+  }, [intersection, roundId, lobby.id, slots, weaponDetails, setLastGameStats]);
 
   void bungieMembershipType;
   void bungieMembershipId;
