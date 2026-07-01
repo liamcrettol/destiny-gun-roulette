@@ -1205,7 +1205,7 @@ export default function LobbyRoom({
   // with the shared Weapon Pool filling the remaining height beneath it. The main
   // loadout column (below) occupies all the space to the left.
   const rightColumn = (
-    <aside className="w-full xl:w-80 shrink-0 xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)] flex flex-col">
+    <aside className="w-full xl:w-96 shrink-0 xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)] flex flex-col">
       {/* Collapse the whole right column to give the loadout full width. */}
       <div className="flex justify-end shrink-0 mb-3">
         <button
