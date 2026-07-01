@@ -289,6 +289,7 @@ export default function LobbyRoom({
   const [captainLocked, setCaptainLocked] = useState(lobby.captain_locked ?? false);
   const [rightOpen, setRightOpen] = useState(true);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false);
   const [minutesToClose, setMinutesToClose] = useState<number | null>(null);
   // Auto-apply: when enabled, equip automatically when the captain clicks Apply.
   // Preference persisted per-device in localStorage.
@@ -882,7 +883,7 @@ export default function LobbyRoom({
   }, [lobby.id, router, stopPolling]);
 
   const handleEndSession = useCallback(async () => {
-    if (!confirm("End this session for everyone? This will close the lobby.")) return;
+    setShowEndSessionConfirm(false);
     stopPolling();
     await fetch("/api/lobby/end", {
       method: "POST",
@@ -1406,7 +1407,7 @@ export default function LobbyRoom({
                 )}
                 {isHost && (
                   <button
-                    onClick={() => { setShowOverflowMenu(false); handleEndSession(); }}
+                    onClick={() => { setShowOverflowMenu(false); setShowEndSessionConfirm(true); }}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-bungie-dark transition"
                   >
                     End Session
@@ -1427,6 +1428,33 @@ export default function LobbyRoom({
               </div>
             )}
           </div>
+
+          {showEndSessionConfirm && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+              <div className="w-full max-w-sm bg-bungie-surface border border-bungie-border rounded-xl shadow-2xl overflow-hidden">
+                <div className="p-5">
+                  <p className="text-white text-base font-semibold mb-1.5">End this session?</p>
+                  <p className="text-gray-400 text-sm leading-snug">
+                    This closes the lobby for everyone in the fireteam. Anyone still in it gets sent back to their dashboard.
+                  </p>
+                </div>
+                <div className="flex gap-2 px-5 pb-5">
+                  <button
+                    onClick={() => setShowEndSessionConfirm(false)}
+                    className="flex-1 px-4 py-2 rounded-full border border-bungie-border text-gray-300 hover:border-gray-400 transition text-sm font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleEndSession}
+                    className="flex-1 px-4 py-2 rounded-full bg-red-700 hover:bg-red-600 text-white transition text-sm font-semibold"
+                  >
+                    End Session
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Stats panel: Session / History / Leaderboard tabs */}
