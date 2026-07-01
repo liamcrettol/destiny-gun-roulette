@@ -5,15 +5,25 @@ in-app highlight on the Roll Comparison screen.
 
 ## Files
 
-- **`best-rolls-template.xlsx`** — the sheet everyone fills out. One row per
-  weapon archetype (94 rows: e.g. Hand Cannon / Adaptive Frame, Shotgun /
-  Aggressive Frame). Barrel/Magazine/Perk 1/Perk 2/Origin columns are
-  dropdowns scoped to exactly what that archetype can actually roll — see the
-  "Instructions" tab in the workbook.
+- **`best-rolls-template.xlsx`** — the blank starter sheet (no entries). Used
+  to seed a fresh Google Sheets import if the live one ever needs to be
+  recreated. One row per weapon archetype (94 rows: e.g. Hand Cannon /
+  Adaptive Frame, Shotgun / Aggressive Frame). Barrel/Magazine/Perk 1/Perk
+  2/Origin columns are dropdowns scoped to exactly what that archetype can
+  actually roll — see the "Instructions" tab in the workbook.
+- **`best-rolls-current.xlsx`** — periodic snapshot of the live, group-edited
+  Google Sheet (downloaded and dropped in here by hand for now — see
+  "Automating the sync" below). This is the one with actual submitted rolls
+  in it.
 - **`archetype-perk-pools.json`** — the raw per-archetype perk pools pulled
   from Bungie's live manifest. This is what the dropdowns are generated from,
   and later becomes the source data for matching a rolled weapon to its
   archetype in-app.
+- **`fix-dropdowns.gs`** — standalone Apps Script (paste into script.google.com,
+  set `SHEET_ID`, run `fixDropdowns`) that rebuilds the archetype-scoped
+  dropdowns and Priority Stat 1/2 validation directly in Sheets. Needed
+  because Excel's `INDIRECT`-based dependent dropdowns don't survive the
+  xlsx → Sheets import.
 
 ## Regenerating the pool data
 
@@ -31,8 +41,19 @@ stay in sync. **Don't hand-edit `archetype-perk-pools.json`.**
 
 ## Workflow
 
-1. Everyone fills out rows in `best-rolls-template.xlsx` for archetypes they
-   have opinions on (no need to complete all 94 — partial is fine).
-2. Once there's real data, it gets imported into the app as a static dataset
-   keyed by (weapon type, frame), which the Roll Comparison screen uses to
-   badge a rolled instance that matches the curated "ideal" perk combo.
+1. Everyone fills out rows in the live Google Sheet for archetypes they have
+   opinions on (no need to complete all 94 — partial is fine).
+2. Periodically, download the Sheet as `.xlsx` and drop it in here as
+   `best-rolls-current.xlsx` (overwrite) so the repo has a record of it.
+3. Once there's enough real data, it gets imported into the app as a static
+   dataset keyed by (weapon type, frame), which the Roll Comparison screen
+   uses to badge a rolled instance that matches the curated "ideal" perk
+   combo.
+
+## Automating the sync (not yet built)
+
+Right now step 2 above is manual (download from Sheets, hand the file to
+Claude). Could be automated with a scheduled GitHub Action that reads the
+Sheet via the Google Sheets API and auto-commits `best-rolls-current.xlsx`
+(or a converted JSON) when it changes — worth doing once the sheet has real
+data and the manual download gets annoying.
