@@ -47,7 +47,8 @@ The app does not store Bungie passwords. Authentication is handled through Bungi
    ```bash
    npm run dev
    ```
-   The server will run on `https://localhost:3000`
+   The server will run on `http://localhost:3000` (plain HTTP — ngrok is what
+   provides the HTTPS tunnel Bungie's OAuth requires, see next step)
 
 4. **Start ngrok in a separate terminal**
    ```bash
@@ -63,10 +64,13 @@ The app does not store Bungie passwords. Authentication is handled through Bungi
    - Save your Client ID and Client Secret
 
 6. **Configure environment variables**
-   - Copy `.env.example` to `.env.local`
-   - Add your Bungie Client ID and Client Secret:
+   - Copy `.env.example` to `.env.local` and fill in every value — `.env.example`
+     is the source of truth for what's required (Bungie OAuth creds, Supabase
+     project keys, `TOKEN_ENCRYPTION_KEY`, `NEXTAUTH_SECRET`). The app won't run
+     past the login screen without a working Supabase connection.
+   - Bungie creds specifically:
      ```
-     NEXT_PUBLIC_BUNGIE_CLIENT_ID=YOUR_CLIENT_ID
+     BUNGIE_CLIENT_ID=YOUR_CLIENT_ID
      BUNGIE_CLIENT_SECRET=YOUR_CLIENT_SECRET
      ```
    - Optionally, set `BUNGIE_REDIRECT_URI` if your redirect URL differs from the default:
@@ -115,6 +119,9 @@ Early development / personal project.
 - [Database migrations](supabase/migrations/README.md) — migrations are applied
   **by hand**, not automatically. Check the status table before assuming a
   migration is live.
+- [Best rolls dataset](data/best-rolls/README.md) — crowd-sourced ideal
+  perk/stat combos per weapon archetype, feeding a future "best roll" badge on
+  the Roll Comparison screen.
 
 ## Contributors
 
