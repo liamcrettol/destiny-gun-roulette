@@ -364,19 +364,6 @@ export default function LobbyRoom({
   // Reset the reroll budget at the start of each round.
   useEffect(() => { setRerollsUsed(0); }, [lobbyData.current_round]);
 
-  // Auto-apply: fire handleApply whenever the captain rolls a new loadout,
-  // but only if the player opted in and the slots have changed from the initial
-  // state loaded from the DB (prevents spurious equips on page load/refresh).
-  useEffect(() => {
-    if (!autoApply || isSpectator) return;
-    if (!selectedCharId || !roundId) return;
-    if (loadingAction === "apply") return;
-    if (slotKey === "0,0,0") return;
-    if (roundLoadedSlotKey === null || slotKey === roundLoadedSlotKey) return;
-    handleApply();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slotKey, autoApply, roundLoadedSlotKey]);
-
   // Load/save favorited rolls.
   useEffect(() => {
     try {
@@ -467,6 +454,19 @@ export default function LobbyRoom({
     else setRollsData({});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId, slotKey]);
+
+  // Auto-apply: fire handleApply whenever the captain rolls a new loadout,
+  // but only if the player opted in and the slots have changed from the initial
+  // state loaded from the DB (prevents spurious equips on page load/refresh).
+  useEffect(() => {
+    if (!autoApply || isSpectator) return;
+    if (!selectedCharId || !roundId) return;
+    if (loadingAction === "apply") return;
+    if (slotKey === "0,0,0") return;
+    if (roundLoadedSlotKey === null || slotKey === roundLoadedSlotKey) return;
+    handleApply();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotKey, autoApply, roundLoadedSlotKey]);
 
   const handleChooseInstance = useCallback((slot: WeaponSlot, instanceId: string) => {
     setMyChosenInstances((prev) => ({ ...prev, [slot]: instanceId }));
