@@ -1,42 +1,33 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Flame, Zap, Sparkles, Snowflake, Waves } from "lucide-react";
-import { DAMAGE_THEME } from "./weaponShared";
+import Image from "next/image";
+import { damageTheme } from "./weaponShared";
+import type { HeroWeaponSample } from "@/lib/bungie/definitions";
 
-// Purely decorative "loadout roll" for the signed-out landing hero - there's
-// no session yet to pull real weapons for, so each slot spins through
-// Destiny's real damage-type colors/icons (same DAMAGE_THEME used
-// throughout the app) using the exact scroll-and-land reel mechanic from
-// WeaponSlotContent in LoadoutQueue.tsx, just keyed off a random interval
-// instead of a real roll.
-const CYCLE = [
-  { type: "Solar", Icon: Flame },
-  { type: "Arc", Icon: Zap },
-  { type: "Void", Icon: Sparkles },
-  { type: "Stasis", Icon: Snowflake },
-  { type: "Strand", Icon: Waves },
-] as const;
-
-const REEL_ITEM_H = 56;
+// Purely decorative "loadout roll" for the signed-out landing hero, spinning
+// through real weapon icons (sampled server-side from the static weapons
+// table - see getRandomWeaponSample) using the exact scroll-and-land reel
+// mechanic WeaponSlotContent uses for real rolls in LoadoutQueue.tsx, just
+// keyed off a random interval instead of an actual captain's roll.
+const REEL_ITEM_H = 64;
 const REEL_PRE_COUNT = 10;
 
-const SLOTS: Array<{ label: string; intervalMs: number; staggerMs: number }> = [
-  { label: "Kinetic", intervalMs: 2800, staggerMs: 0 },
-  { label: "Energy", intervalMs: 2800, staggerMs: 160 },
-  { label: "Power", intervalMs: 2800, staggerMs: 320 },
+const SLOTS: Array<{ intervalMs: number; staggerMs: number }> = [
+  { intervalMs: 2800, staggerMs: 0 },
+  { intervalMs: 2800, staggerMs: 160 },
+  { intervalMs: 2800, staggerMs: 320 },
 ];
 
-function randomCycleIndex(exclude?: number): number {
-  let i = Math.floor(Math.random() * CYCLE.length);
-  if (exclude !== undefined && CYCLE.length > 1) {
-    while (i === exclude) i = Math.floor(Math.random() * CYCLE.length);
-  }
+function randomIndex(len: number, exclude?: number): number {
+  if (len <= 1) return 0;
+  let i = Math.floor(Math.random() * len);
+  while (i === exclude) i = Math.floor(Math.random() * len);
   return i;
 }
 
-function ReelSlot({ intervalMs, staggerMs }: { intervalMs: number; staggerMs: number }) {
-  const [targetIndex, setTargetIndex] = useState(() => randomCycleIndex());
+function ReelSlot({ weapons, intervalMs, staggerMs }: { weapons: HeroWeaponSample[]; intervalMs: number; staggerMs: number }) {
+  const [targetIndex, setTargetIndex] = useState(() => randomIndex(weapons.length));
   const [reelItems, setReelItems] = useState<number[]>([targetIndex]);
   const [spinning, setSpinning] = useState(false);
   const [landed, setLanded] = useState(false);
@@ -46,10 +37,10 @@ function ReelSlot({ intervalMs, staggerMs }: { intervalMs: number; staggerMs: nu
   // Advance to a new random target on an interval.
   useEffect(() => {
     const id = setInterval(() => {
-      setTargetIndex((i) => randomCycleIndex(i));
+      setTargetIndex((i) => randomIndex(weapons.length, i));
     }, intervalMs);
     return () => clearInterval(id);
-  }, [intervalMs]);
+  }, [weapons.length, intervalMs]);
 
   // Build the pre-roll reel once the target changes, after this slot's stagger delay.
   useEffect(() => {
@@ -58,13 +49,13 @@ function ReelSlot({ intervalMs, staggerMs }: { intervalMs: number; staggerMs: nu
       return;
     }
     const staggerTimer = setTimeout(() => {
-      const randoms = Array.from({ length: REEL_PRE_COUNT }, () => randomCycleIndex());
+      const randoms = Array.from({ length: REEL_PRE_COUNT }, () => randomIndex(weapons.length));
       setReelItems([...randoms, targetIndex]);
       setSpinning(true);
       setLanded(false);
     }, staggerMs);
     return () => clearTimeout(staggerTimer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetIndex]);
 
   // Kick off the CSS scroll once reelItems + spinning are set.
@@ -97,45 +88,39 @@ function ReelSlot({ intervalMs, staggerMs }: { intervalMs: number; staggerMs: nu
       cancelAnimationFrame(rafId);
       clearTimeout(landTimer);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinning, reelItems]);
 
-  const theme = DAMAGE_THEME[CYCLE[targetIndex].type];
+  const theme = damageTheme(weapons[targetIndex]?.damageType);
 
   return (
     <div
-      className={`relative rounded-xl border overflow-hidden shrink-0 transition-shadow duration-300 ${theme.border} ${
+      className={`relative rounded-xl border overflow-hidden shrink-0 bg-gray-800 transition-shadow duration-300 ${theme.border} ${
         landed ? "animate-slot-land" : ""
       }`}
       style={{ width: REEL_ITEM_H, height: REEL_ITEM_H }}
     >
-      <div ref={reelRef} style={{ willChange: "transform" }}>
-        {reelItems.map((ci, i) => {
-          const cell = DAMAGE_THEME[CYCLE[ci].type];
-          const Icon = CYCLE[ci].Icon;
-          return (
-            <div
-              key={i}
-              style={{ width: REEL_ITEM_H, height: REEL_ITEM_H }}
-              className={`flex items-center justify-center ${cell.bg}`}
-            >
-              <Icon size={24} className={cell.text} />
-            </div>
-          );
-        })}
+      <div
+        ref={reelRef}
+        style={{ willChange: "transform", filter: "blur(3px)" }}
+      >
+        {reelItems.map((wi, i) => (
+          <div key={i} style={{ width: REEL_ITEM_H, height: REEL_ITEM_H, position: "relative" }}>
+            <Image src={weapons[wi].icon} alt="" fill className="object-cover" unoptimized />
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-export default function HeroReel() {
+export default function HeroReel({ weapons }: { weapons: HeroWeaponSample[] }) {
+  if (weapons.length === 0) return null;
+
   return (
-    <div className="flex items-center gap-3" aria-hidden="true">
-      {SLOTS.map((slot) => (
-        <div key={slot.label} className="flex flex-col items-center gap-1.5">
-          <ReelSlot intervalMs={slot.intervalMs} staggerMs={slot.staggerMs} />
-          <span className="text-[10px] uppercase tracking-wider text-gray-500">{slot.label}</span>
-        </div>
+    <div className="flex items-center gap-4" aria-hidden="true">
+      {SLOTS.map((slot, i) => (
+        <ReelSlot key={i} weapons={weapons} intervalMs={slot.intervalMs} staggerMs={slot.staggerMs} />
       ))}
     </div>
   );

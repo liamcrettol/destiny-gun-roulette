@@ -83,6 +83,28 @@ export function getWeaponGroupHashes(itemHash: number): number[] {
   return GROUP_TO_HASHES.get(key) ?? [itemHash];
 }
 
+export interface HeroWeaponSample { name: string; icon: string; damageType: string }
+
+/**
+ * A random sample of real weapons (icon, name, damage type) from the static
+ * table - purely decorative, not tied to any player's inventory. Used for the
+ * signed-out landing page's spinning weapon reel. Legendary/Exotic only since
+ * those read better as small icons than the plainer common/uncommon art.
+ */
+export function getRandomWeaponSample(count: number): HeroWeaponSample[] {
+  const pool: HeroWeaponSample[] = [];
+  for (const def of WEAPONS.values()) {
+    if (!def.icon) continue;
+    if (def.tierType < 5) continue;
+    pool.push({ name: def.name, icon: def.icon, damageType: def.damageType });
+  }
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
+
 export interface PerkInfo { name: string; description: string; stats?: Record<string, number> }
 
 /** Resolve perk hashes to { name, description }. Unknown/cosmetic hashes are omitted. */
