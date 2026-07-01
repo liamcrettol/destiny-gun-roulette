@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/supabase/admin";
 
+const SAFE_RETURN_TO_RE = /^\/join\/[A-Z0-9]{4,8}$/;
+
 export async function GET(req: NextRequest) {
   const state = crypto.randomUUID();
   const reauth = req.nextUrl.searchParams.has("reauth");
+  const rawReturnTo = req.nextUrl.searchParams.get("returnTo");
+  const returnTo = rawReturnTo && SAFE_RETURN_TO_RE.test(rawReturnTo) ? rawReturnTo : null;
 
   // Store state in DB - cookies aren't reliable across serverless redirects
   await adminSupabase.from("oauth_states").insert({
     state,
     expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    ...(returnTo ? { return_to: returnTo } : {}),
   });
 
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";

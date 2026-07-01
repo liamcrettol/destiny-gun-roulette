@@ -29,12 +29,13 @@ export async function GET(req: NextRequest) {
   // Validate CSRF state against DB
   const { data: storedState } = await adminSupabase
     .from("oauth_states")
-    .select("state")
+    .select("state, return_to")
     .eq("state", state)
     .gt("expires_at", new Date().toISOString())
     .single();
 
   if (!storedState) return errRedirect("state_mismatch");
+  const returnTo: string = storedState.return_to ?? "/dashboard";
   await adminSupabase.from("oauth_states").delete().eq("state", state);
 
   // Exchange auth code for tokens
@@ -169,7 +170,7 @@ export async function GET(req: NextRequest) {
     return errRedirect("jwt_encode_failed", String(e));
   }
 
-  const response = NextResponse.redirect(`${BASE_URL}/dashboard`);
+  const response = NextResponse.redirect(`${BASE_URL}${returnTo}`);
   response.cookies.set(cookieName, sessionToken, {
     httpOnly: true,
     secure: isProd,
