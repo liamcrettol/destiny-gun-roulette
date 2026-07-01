@@ -211,8 +211,6 @@ export default function LoadoutQueue({
           return (
             <div
               key={slotName}
-              onMouseEnter={hasWeapon ? (e) => onHover(slot!.item_hash, e) : undefined}
-              onMouseLeave={hasWeapon ? onLeave : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${
                 idx > 0 ? "border-t border-bungie-border/30" : ""
               } ${hasWeapon ? "hover:bg-white/[0.02]" : ""}`}
@@ -226,7 +224,8 @@ export default function LoadoutQueue({
               {/* Slot name */}
               <span className="w-12 shrink-0 text-[10px] uppercase tracking-wider text-gray-500">{slotName}</span>
 
-              {/* Icon + weapon text */}
+              {/* Icon + weapon text - hover/tooltip trigger is scoped to just this,
+                  not the whole row, so it only fires over the gun itself. */}
               {isWildcard ? (
                 <>
                   <div
@@ -241,19 +240,25 @@ export default function LoadoutQueue({
                   </div>
                 </>
               ) : slot ? (
-                <WeaponSlotContent
-                  hash={slot.item_hash}
-                  icon={slot.weapon_icon}
-                  watermark={weaponDetails[slot.item_hash]?.watermark}
-                  name={slot.weapon_name}
-                  weaponType={slot.weapon_type}
-                  damageType={slot.damage_type}
-                  isCollection={collectionHashes.has(slot.item_hash)}
-                  theme={theme}
-                  iconPool={iconPool}
-                  slot={slotName}
-                  animKindRef={animKindRef}
-                />
+                <div
+                  className="flex items-center gap-3 flex-1 min-w-0 cursor-help"
+                  onMouseEnter={(e) => onHover(slot.item_hash, e)}
+                  onMouseLeave={onLeave}
+                >
+                  <WeaponSlotContent
+                    hash={slot.item_hash}
+                    icon={slot.weapon_icon}
+                    watermark={weaponDetails[slot.item_hash]?.watermark}
+                    name={slot.weapon_name}
+                    weaponType={slot.weapon_type}
+                    damageType={slot.damage_type}
+                    isCollection={collectionHashes.has(slot.item_hash)}
+                    theme={theme}
+                    iconPool={iconPool}
+                    slot={slotName}
+                    animKindRef={animKindRef}
+                  />
+                </div>
               ) : (
                 <>
                   <div
