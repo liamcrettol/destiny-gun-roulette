@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Lobby } from "@/types/lobby";
 
 const STATUS_LABELS: Record<Lobby["status"], string> = {
@@ -12,8 +13,6 @@ const STATUS_LABELS: Record<Lobby["status"], string> = {
   done: "Ended",
 };
 
-type RollMode = "normal" | "chaos" | "meta";
-
 interface Props {
   activeSession?: { code: string; status: Lobby["status"] } | null;
 }
@@ -21,32 +20,8 @@ interface Props {
 export default function LobbyControls({ activeSession }: Props) {
   const router = useRouter();
   const [code, setCode] = useState("");
-  const [loading, setLoading] = useState<"create" | "join" | null>(null);
+  const [loading, setLoading] = useState<"join" | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Creation settings
-  const [showSettings, setShowSettings] = useState(false);
-  const [rollMode, setRollMode] = useState<RollMode>("normal");
-  const [rerollLimit, setRerollLimit] = useState<number | null>(null);
-  const [noDup, setNoDup] = useState(false);
-
-  async function handleCreate() {
-    setLoading("create");
-    setError(null);
-    try {
-      const res = await fetch("/api/lobby/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: { mode: rollMode, rerollLimit, noDup } }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      router.push(`/lobby/${data.code}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create lobby");
-      setLoading(null);
-    }
-  }
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -95,87 +70,15 @@ export default function LobbyControls({ activeSession }: Props) {
           <div>
             <h2 className="text-lg font-semibold text-white mb-1">Create Lobby</h2>
             <p className="text-gray-400 text-sm">
-              Create a lobby and share the code with your fireteam.
+              Configure roll settings and share the code with your fireteam.
             </p>
           </div>
-
-          {/* Settings toggle */}
-          <button
-            onClick={() => setShowSettings((v) => !v)}
-            className="flex items-center justify-between text-xs text-gray-400 hover:text-gray-200 transition select-none"
+          <Link
+            href="/lobby/new"
+            className="mt-auto w-full bg-bungie-blue hover:opacity-90 text-white font-semibold py-2.5 rounded-lg transition text-center text-sm"
           >
-            <span>Roll Settings</span>
-            <span className="text-[10px]">{showSettings ? "▲" : "▼"}</span>
-          </button>
-
-          {showSettings && (
-            <div className="space-y-4 pt-1 border-t border-bungie-border/40">
-              {/* Roll mode */}
-              <div>
-                <p className="text-xs text-gray-400 mb-1.5">Roll Mode</p>
-                <div className="flex gap-2">
-                  {(["normal", "chaos", "meta"] as RollMode[]).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setRollMode(m)}
-                      className={`flex-1 py-1.5 text-xs rounded-lg border capitalize transition ${
-                        rollMode === m
-                          ? "border-bungie-blue bg-bungie-blue/20 text-white font-semibold"
-                          : "border-bungie-border text-gray-400 hover:border-gray-400"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Reroll limit */}
-              <div>
-                <p className="text-xs text-gray-400 mb-1.5">Rerolls / round</p>
-                <div className="flex gap-2">
-                  {([null, 3, 5, 10] as (number | null)[]).map((v) => (
-                    <button
-                      key={String(v)}
-                      onClick={() => setRerollLimit(v)}
-                      className={`flex-1 py-1.5 text-xs rounded-lg border transition ${
-                        rerollLimit === v
-                          ? "border-bungie-blue bg-bungie-blue/20 text-white font-semibold"
-                          : "border-bungie-border text-gray-400 hover:border-gray-400"
-                      }`}
-                    >
-                      {v === null ? "∞" : v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* No duplicates */}
-              <label className="flex items-center gap-2 cursor-pointer select-none group">
-                <button
-                  role="switch"
-                  aria-checked={noDup}
-                  onClick={() => setNoDup((v) => !v)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border transition-colors duration-200 focus:outline-none ${
-                    noDup ? "bg-green-700 border-green-600" : "bg-bungie-dark border-bungie-border group-hover:border-gray-500"
-                  }`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${noDup ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-                <span className={`text-xs transition-colors ${noDup ? "text-green-400" : "text-gray-400"}`}>
-                  No duplicate weapon types
-                </span>
-              </label>
-            </div>
-          )}
-
-          <button
-            onClick={handleCreate}
-            disabled={loading !== null}
-            className="w-full bg-bungie-blue hover:opacity-90 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition mt-auto"
-          >
-            {loading === "create" ? "Creating..." : "Create Lobby"}
-          </button>
+            Create Lobby
+          </Link>
         </div>
 
         {/* Join */}

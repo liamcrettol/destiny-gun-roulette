@@ -14,9 +14,7 @@ import RollDetails, { type RollsData } from "./RollDetails";
 import type { ApplyResult } from "@/types/lobby";
 import { trimBungieName } from "@/lib/utils";
 import PlayerCard from "./PlayerCard";
-import RollSettingsPopover from "./RollSettingsPopover";
-import CaptainSettingsCard from "./CaptainSettingsCard";
-import { Shuffle, Zap, SlidersHorizontal, Crown, Check, Copy, X, MoreHorizontal, Lock, User, PanelRightOpen, PanelRightClose, Clock } from "lucide-react";
+import { Shuffle, Zap, Crown, Check, Copy, X, MoreHorizontal, Lock, User, PanelRightOpen, PanelRightClose, Clock } from "lucide-react";
 
 interface PlayerStat {
   userId: string;
@@ -286,7 +284,6 @@ export default function LobbyRoom({
 
   // Captain-only toggles
   const [captainLocked, setCaptainLocked] = useState(lobby.captain_locked ?? false);
-  const [rollSettingsOpen, setRollSettingsOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(true);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [minutesToClose, setMinutesToClose] = useState<number | null>(null);
@@ -305,12 +302,13 @@ export default function LobbyRoom({
     (lobby.roll_settings?.mode as "normal" | "chaos" | "meta") ?? "normal"
   );
   const [noDupMode, setNoDupMode] = useState(lobby.roll_settings?.noDup ?? false);
-  const [bannedTypes, setBannedTypes] = useState<Set<string>>(new Set());
+  const [bannedTypes, setBannedTypes] = useState<Set<string>>(
+    new Set(lobby.roll_settings?.banned ?? [])
+  );
   const [rerollLimit, setRerollLimit] = useState<number | null>(
     lobby.roll_settings?.rerollLimit ?? null
   );
   const [rerollsUsed, setRerollsUsed] = useState(0);
-  const [showRollSettings, setShowRollSettings] = useState(false);
 
   // Every weapon rolled per slot this lobby session (most-recent first). Rolls
   // avoid everything already used in that slot until the shared pool is
@@ -325,22 +323,6 @@ export default function LobbyRoom({
     if (hist[0] === hash) return; // unchanged, don't duplicate
     recentRollsRef.current[slot] = [hash, ...hist.filter((h) => h !== hash)];
   }, []);
-
-  // Load saved banned types from localStorage. Mode/rerollLimit/noDup come from
-  // lobby.roll_settings (set at creation) and are not overridden from localStorage.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("gr_roll_prefs");
-      if (!raw) return;
-      const p = JSON.parse(raw);
-      if (Array.isArray(p.banned)) setBannedTypes(new Set(p.banned));
-    } catch { /* ignore */ }
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem("gr_roll_prefs", JSON.stringify({ banned: [...bannedTypes] }));
-    } catch { /* ignore */ }
-  }, [bannedTypes]);
 
   // Keep captainLocked in sync with real-time lobby updates
   useEffect(() => { setCaptainLocked(lobbyData.captain_locked ?? false); }, [lobbyData.captain_locked]);
@@ -478,17 +460,6 @@ export default function LobbyRoom({
     return { kinetic: filt(intersection.kinetic), energy: filt(intersection.energy), power: filt(intersection.power) };
   }, [intersection, bannedTypes, weaponDisplayType]);
 
-  // Distinct weapon types in the current pool (for the ban checkboxes).
-  const poolWeaponTypes = useMemo(() => {
-    if (!intersection) return [] as string[];
-    const s = new Set<string>();
-    for (const slot of ["kinetic", "energy", "power"] as WeaponSlot[])
-      for (const h of intersection[slot]) {
-        const t = weaponDisplayType(h);
-        if (t) s.add(t);
-      }
-    return [...s].sort();
-  }, [intersection, weaponDisplayType]);
 
   const copyCode = useCallback(async () => {
     try {
@@ -1271,46 +1242,6 @@ export default function LobbyRoom({
           </>
         )}
 
-        {/* Settings: captain edits roll settings; everyone else sees them read-only. */}
-        {!isSpectator && (isCaptain ? intersection != null : true) && (
-          <>
-            <div className="mx-3 h-px bg-bungie-border/40" />
-            <div className="px-3 pt-2 pb-3">
-              <button
-                onClick={() => setRollSettingsOpen((v) => !v)}
-                className="w-full flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-600 hover:text-gray-400 transition mb-2"
-              >
-                <SlidersHorizontal size={12} className="shrink-0" />
-                <span className="flex-1 text-left">{isCaptain ? "Roll Settings" : "Captain's Settings"}</span>
-                {isCaptain && bannedTypes.size > 0 && (
-                  <span className="text-yellow-500/80 normal-case tracking-normal">{bannedTypes.size} banned</span>
-                )}
-                <span className="text-[9px]">{rollSettingsOpen ? "▲" : "▼"}</span>
-              </button>
-              {rollSettingsOpen && (
-                isCaptain ? (
-                  <RollSettingsPopover
-                    inline
-                    anchorRef={{ current: null }}
-                    onClose={() => {}}
-                    rollMode={rollMode}
-                    onRollModeChange={setRollMode}
-                    rerollLimit={rerollLimit}
-                    onRerollLimitChange={setRerollLimit}
-                    rerollsUsed={rerollsUsed}
-                    noDupMode={noDupMode}
-                    onNoDupChange={setNoDupMode}
-                    bannedTypes={bannedTypes}
-                    onBannedTypesChange={setBannedTypes}
-                    poolWeaponTypes={poolWeaponTypes}
-                  />
-                ) : (
-                  <CaptainSettingsCard settings={lobbyData.roll_settings} />
-                )
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {/* Shared Weapon Pool — always open, no internal scroll (parent scrolls). */}
